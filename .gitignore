@@ -1,0 +1,8 @@
+node_modules/
+dist/
+*.tsbuildinfo
+.env
+backups/*.dump
+backups/*.dump.enc
+image.png
+tmp/

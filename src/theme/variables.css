@@ -1,0 +1,23 @@
+@import '@ionic/react/css/core.css';
+@import '@ionic/react/css/normalize.css';
+@import '@ionic/react/css/structure.css';
+@import '@ionic/react/css/typography.css';
+@import '@ionic/react/css/padding.css';
+@import '@ionic/react/css/float-elements.css';
+@import '@ionic/react/css/text-alignment.css';
+@import '@ionic/react/css/text-transformation.css';
+@import '@ionic/react/css/flex-utils.css';
+@import '@ionic/react/css/display.css';
+
+:root {
+  --ion-font-family: 'Aptos', 'Segoe UI', sans-serif;
+  --ion-color-primary: #1768a6;
+  --ion-color-primary-rgb: 23, 104, 166;
+  --ion-color-primary-contrast: #ffffff;
+  --ion-color-primary-shade: #145b92;
+  --ion-color-primary-tint: #2e77af;
+  --ion-color-success: #17866b;
+  --ion-color-danger: #c45437;
+  --ion-background-color: #f3f6f8;
+  --ion-text-color: #1b2935;
+}
