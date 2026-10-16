@@ -21,7 +21,7 @@ app.get('/api/state', async (_request, response, next) => {
   try {
     const [categories, movements, accounts] = await Promise.all([
       pool.query('SELECT id, name, kind, active FROM categories ORDER BY kind, name'),
-      pool.query('SELECT id, movement_date AS date, kind, amount, category_id AS "categoryId", account_key AS account, to_account_key AS "toAccount", note FROM movements ORDER BY movement_date, created_at'),
+      pool.query(`SELECT id, to_char(movement_date, 'YYYY-MM-DD') AS date, kind, amount, category_id AS "categoryId", account_key AS account, to_account_key AS "toAccount", note FROM movements ORDER BY movement_date, created_at`),
       pool.query('SELECT account_key, opening_balance FROM accounts'),
     ]);
     response.json({
@@ -38,7 +38,7 @@ app.post('/api/movements', async (request, response, next) => {
     const { rows } = await pool.query(
       `INSERT INTO movements (movement_date, kind, amount, category_id, account_key, to_account_key, note)
        VALUES ($1, $2, $3, $4, $5, $6, $7)
-       RETURNING id, movement_date AS date, kind, amount, category_id AS "categoryId", account_key AS account, to_account_key AS "toAccount", note`,
+       RETURNING id, to_char(movement_date, 'YYYY-MM-DD') AS date, kind, amount, category_id AS "categoryId", account_key AS account, to_account_key AS "toAccount", note`,
       [row.date, row.kind, row.amount, row.categoryId, row.account, row.toAccount, row.note],
     );
     response.status(201).json({ ...rows[0], amount: Number(rows[0].amount) });
@@ -51,7 +51,7 @@ app.put('/api/movements/:id', async (request, response, next) => {
     const { rows } = await pool.query(
       `UPDATE movements SET movement_date=$1, kind=$2, amount=$3, category_id=$4, account_key=$5, to_account_key=$6, note=$7
        WHERE id=$8
-       RETURNING id, movement_date AS date, kind, amount, category_id AS "categoryId", account_key AS account, to_account_key AS "toAccount", note`,
+       RETURNING id, to_char(movement_date, 'YYYY-MM-DD') AS date, kind, amount, category_id AS "categoryId", account_key AS account, to_account_key AS "toAccount", note`,
       [row.date, row.kind, row.amount, row.categoryId, row.account, row.toAccount, row.note, request.params.id],
     );
     if (!rows[0]) return response.status(404).json({ error: 'Movimiento no encontrado.' });
