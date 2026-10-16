@@ -17,6 +17,7 @@ const dump = Buffer.concat([decipher.update(encrypted), decipher.final()]);
 process.stdout.write('Esto reemplazará los datos actuales de PostgreSQL con el respaldo. Escribe REEMPLAZAR para continuar: ');
 const confirmation = await promptLine();
 if (confirmation !== 'REEMPLAZAR') throw new Error('Restauración cancelada.');
+execFileSync('node', ['scripts/prepare-local.mjs'], { stdio: 'inherit' });
 execFileSync('docker', ['compose', 'up', '-d', '--wait', 'db'], { stdio: 'inherit' });
 const env = Object.fromEntries((await readFile('.env', 'utf8')).split(/\r?\n/).filter((line) => line && !line.startsWith('#')).map((line) => {
   const index = line.indexOf('=');

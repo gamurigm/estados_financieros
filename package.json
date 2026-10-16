@@ -6,8 +6,8 @@
   "scripts": {
     "dev": "vite",
     "api": "tsx watch server/index.ts",
-    "prelocal": "node scripts/prepare-local.mjs",
-    "local": "docker compose up -d --wait db && concurrently -k \"npm run api\" \"npm run dev\"",
+    "db:up": "node scripts/prepare-local.mjs && docker compose up -d --wait db",
+    "local": "npm run db:up && concurrently -k \"npm run api\" \"npm run dev\"",
     "backup": "node scripts/backup.mjs",
     "restore": "node scripts/restore.mjs",
     "build": "tsc -b && vite build",
