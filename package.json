@@ -8,7 +8,7 @@
     "api": "tsx watch server/index.ts",
     "db:up": "node scripts/prepare-local.mjs && docker compose up -d --wait db",
     "db:migrate": "node scripts/migrate.mjs",
-    "test:server": "tsx --test server/auth-crypto.test.ts",
+    "test:server": "tsx --test server/auth-crypto.test.ts server/auth-routes.test.ts",
     "owner:create": "tsx scripts/create-owner.mjs",
     "local": "npm run db:up && npm run db:migrate && concurrently -k \"npm run api\" \"npm run dev\"",
     "backup": "node scripts/backup.mjs",
@@ -19,14 +19,17 @@
   "dependencies": {
     "@ionic/react": "^9.0.0",
     "argon2": "^0.45.1",
+    "cookie-parser": "^1.4.7",
     "dotenv": "^16.5.0",
     "express": "^5.1.0",
+    "express-rate-limit": "^8.7.1",
     "ionicons": "^8.0.0",
     "pg": "^8.15.6",
     "react": "^19.0.0",
     "react-dom": "^19.0.0"
   },
   "devDependencies": {
+    "@types/cookie-parser": "^1.4.10",
     "@types/express": "^5.0.1",
     "@types/node": "^22.15.30",
     "@types/pg": "^8.15.2",
