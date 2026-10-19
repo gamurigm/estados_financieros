@@ -1,5 +1,7 @@
 import { getApiBaseUrl } from './config';
 import { sessionManager } from '../auth/session';
+import type { Movement } from './contracts';
+import { router } from 'expo-router';
 
 const networkError = 'No se pudo conectar al servidor. Revisa tu conexión e inténtalo de nuevo.';
 
@@ -10,6 +12,10 @@ export async function apiRequest<T>(path: string, init?: RequestInit): Promise<T
   if (response.status === 401 && await sessionManager.refresh()) {
     response = await sendAuthorizedRequest(url, init);
   }
+  if (response.status === 401) {
+    router.replace('/login');
+    throw new Error('La sesión venció. Inicia sesión otra vez.');
+  }
 
   if (!response.ok) {
     const payload = await response.json().catch(() => null) as { error?: unknown } | null;
@@ -17,6 +23,18 @@ export async function apiRequest<T>(path: string, init?: RequestInit): Promise<T
   }
   if (response.status === 204) return undefined as T;
   return await response.json() as T;
+}
+
+export function saveMovement(movement: Omit<Movement, 'id'>, id?: string) {
+  const path = id ? `/api/movements/${encodeURIComponent(id)}` : '/api/movements';
+  return apiRequest<Movement>(path, {
+    method: id ? 'PUT' : 'POST',
+    body: JSON.stringify(movement),
+  });
+}
+
+export function deleteMovement(id: string) {
+  return apiRequest<void>(`/api/movements/${encodeURIComponent(id)}`, { method: 'DELETE' });
 }
 
 async function sendAuthorizedRequest(url: string, init?: RequestInit) {

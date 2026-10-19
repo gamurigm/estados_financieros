@@ -1,4 +1,4 @@
-import { FlatList, StyleSheet, Text, View } from 'react-native';
+import { FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
 import type { ReactElement } from 'react';
 import type { Category, Movement } from '../../api/contracts';
 
@@ -11,9 +11,10 @@ type Props = {
   header: ReactElement;
   refreshing: boolean;
   onRefresh: () => void;
+  onEditMovement: (movement: Movement) => void;
 };
 
-export function MovementList({ movements, categories, header, refreshing, onRefresh }: Props) {
+export function MovementList({ movements, categories, header, refreshing, onRefresh, onEditMovement }: Props) {
   const recentFirst = [...movements].sort((left, right) => right.date.localeCompare(left.date) || right.id.localeCompare(left.id));
 
   return (
@@ -25,13 +26,13 @@ export function MovementList({ movements, categories, header, refreshing, onRefr
       ListHeaderComponent={header}
       onRefresh={onRefresh}
       refreshing={refreshing}
-      renderItem={({ item }) => <MovementRow movement={item} categories={categories} />}
+      renderItem={({ item }) => <MovementRow movement={item} categories={categories} onPress={() => onEditMovement(item)} />}
       showsVerticalScrollIndicator={false}
     />
   );
 }
 
-function MovementRow({ movement, categories }: { movement: Movement; categories: Category[] }) {
+function MovementRow({ movement, categories, onPress }: { movement: Movement; categories: Category[]; onPress: () => void }) {
   const category = categories.find((item) => item.id === movement.categoryId);
   const title = movement.kind === 'transfer' ? 'Transferencia' : category?.name ?? 'Movimiento';
   const detail = movement.kind === 'transfer'
@@ -44,15 +45,16 @@ function MovementRow({ movement, categories }: { movement: Movement; categories:
   const sign = movement.kind === 'income' ? '+' : movement.kind === 'expense' ? '−' : '';
   const amountStyle = movement.kind === 'income' ? styles.income : movement.kind === 'expense' ? styles.expense : styles.transfer;
 
+  const canEdit = movement.kind !== 'transfer';
   return (
-    <View style={styles.row}>
+    <Pressable accessibilityRole={canEdit ? 'button' : undefined} disabled={!canEdit} onPress={onPress} style={styles.row}>
       <View style={[styles.kindDot, movement.kind === 'income' ? styles.incomeDot : movement.kind === 'expense' ? styles.expenseDot : styles.transferDot]} />
       <View style={styles.description}>
         <Text numberOfLines={1} style={styles.title}>{title}</Text>
         <Text numberOfLines={1} style={styles.detail}>{dateLabel} · {detail}{movement.note ? ` · ${movement.note}` : ''}</Text>
       </View>
       <Text style={[styles.amount, amountStyle]}>{sign}{currency.format(movement.amount)}</Text>
-    </View>
+    </Pressable>
   );
 }
 

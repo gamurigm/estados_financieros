@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -8,7 +8,7 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { router } from 'expo-router';
+import { router, useFocusEffect } from 'expo-router';
 import { apiRequest } from '../../src/api/client';
 import type { AccountId, FinanceState } from '../../src/api/contracts';
 import { sessionManager } from '../../src/auth/session';
@@ -44,7 +44,10 @@ export default function MonthlyLedgerScreen() {
     }
   }, []);
 
-  useEffect(() => { void load(); }, [load]);
+  useFocusEffect(useCallback(() => {
+    void load();
+    return undefined;
+  }, [load]));
 
   const summary = useMemo(() => data ? getMonthlySummary(data, month, filter) : null, [data, month, filter]);
 
@@ -95,6 +98,11 @@ export default function MonthlyLedgerScreen() {
             <BalanceCard label="Efectivo" amount={summary.balances.cash} />
             <BalanceCard label="Débito" amount={summary.balances.bank} />
           </View>
+          <View style={styles.actionsRow}>
+            <ActionButton label="Ingreso" onPress={() => router.push({ pathname: '/movements/new', params: { kind: 'income' } })} />
+            <ActionButton label="Gasto" onPress={() => router.push({ pathname: '/movements/new', params: { kind: 'expense' } })} />
+            <ActionButton label="Transferir" onPress={() => router.push('/transfers/new')} />
+          </View>
         </>
       ) : null}
 
@@ -144,6 +152,7 @@ export default function MonthlyLedgerScreen() {
         categories={data.categories}
         header={header}
         movements={summary?.movements ?? []}
+        onEditMovement={(movement) => router.push({ pathname: '/movements/[id]', params: { id: movement.id } })}
         onRefresh={() => { void load(true); }}
         refreshing={refreshing}
       />
@@ -169,6 +178,15 @@ function BalanceCard({ label, amount }: { label: string; amount: number }) {
       <Text style={styles.balanceLabel}>{label}</Text>
       <Text style={styles.balanceAmount}>{currency.format(amount)}</Text>
     </View>
+  );
+}
+
+function ActionButton({ label, onPress }: { label: string; onPress: () => void }) {
+  return (
+    <Pressable accessibilityRole="button" onPress={onPress} style={styles.actionButton}>
+      <Text style={styles.actionPlus}>+</Text>
+      <Text style={styles.actionText}>{label}</Text>
+    </Pressable>
   );
 }
 
@@ -222,6 +240,10 @@ const styles = StyleSheet.create({
   balanceCard: { backgroundColor: '#ffffff', borderColor: '#e4e9e2', borderRadius: 15, borderWidth: 1, flex: 1, paddingHorizontal: 13, paddingVertical: 12 },
   balanceLabel: { color: '#738078', fontSize: 11, fontWeight: '600' },
   balanceAmount: { color: '#253b30', fontSize: 14, fontWeight: '800', marginTop: 7 },
+  actionsRow: { flexDirection: 'row', gap: 8, marginTop: 13 },
+  actionButton: { alignItems: 'center', backgroundColor: '#ffffff', borderColor: '#dce4dc', borderRadius: 13, borderWidth: 1, flex: 1, flexDirection: 'row', justifyContent: 'center', minHeight: 43, paddingHorizontal: 4 },
+  actionPlus: { color: '#315e45', fontSize: 18, fontWeight: '600', marginRight: 4 },
+  actionText: { color: '#315e45', fontSize: 10, fontWeight: '800' },
   filterHeader: { alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between', marginTop: 22 },
   filters: { flexDirection: 'row', gap: 8, marginTop: 10 },
   filterPill: { backgroundColor: '#ffffff', borderColor: '#dce4dc', borderRadius: 12, borderWidth: 1, paddingHorizontal: 13, paddingVertical: 8 },
