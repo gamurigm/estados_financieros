@@ -103,6 +103,10 @@ export default function MonthlyLedgerScreen() {
             <ActionButton label="Gasto" onPress={() => router.push({ pathname: '/movements/new', params: { kind: 'expense' } })} />
             <ActionButton label="Transferir" onPress={() => router.push('/transfers/new')} />
           </View>
+          <View style={styles.settingsRow}>
+            <Pressable accessibilityRole="button" onPress={() => router.push('/categories')} style={styles.settingsButton}><Text style={styles.settingsText}>Administrar rubros</Text></Pressable>
+            <Pressable accessibilityRole="button" onPress={() => router.push('/balances')} style={styles.settingsButton}><Text style={styles.settingsText}>Saldos iniciales</Text></Pressable>
+          </View>
         </>
       ) : null}
 
@@ -244,6 +248,9 @@ const styles = StyleSheet.create({
   actionButton: { alignItems: 'center', backgroundColor: '#ffffff', borderColor: '#dce4dc', borderRadius: 13, borderWidth: 1, flex: 1, flexDirection: 'row', justifyContent: 'center', minHeight: 43, paddingHorizontal: 4 },
   actionPlus: { color: '#315e45', fontSize: 18, fontWeight: '600', marginRight: 4 },
   actionText: { color: '#315e45', fontSize: 10, fontWeight: '800' },
+  settingsRow: { flexDirection: 'row', gap: 8, marginTop: 8 },
+  settingsButton: { alignItems: 'center', backgroundColor: '#e9eee8', borderRadius: 11, flex: 1, justifyContent: 'center', minHeight: 38, paddingHorizontal: 8 },
+  settingsText: { color: '#486557', fontSize: 10, fontWeight: '700' },
   filterHeader: { alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between', marginTop: 22 },
   filters: { flexDirection: 'row', gap: 8, marginTop: 10 },
   filterPill: { backgroundColor: '#ffffff', borderColor: '#dce4dc', borderRadius: 12, borderWidth: 1, paddingHorizontal: 13, paddingVertical: 8 },
