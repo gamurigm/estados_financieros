@@ -7,7 +7,10 @@
     "dev": "vite",
     "api": "tsx watch server/index.ts",
     "db:up": "node scripts/prepare-local.mjs && docker compose up -d --wait db",
-    "local": "npm run db:up && concurrently -k \"npm run api\" \"npm run dev\"",
+    "db:migrate": "node scripts/migrate.mjs",
+    "test:server": "tsx --test server/auth-crypto.test.ts",
+    "owner:create": "tsx scripts/create-owner.mjs",
+    "local": "npm run db:up && npm run db:migrate && concurrently -k \"npm run api\" \"npm run dev\"",
     "backup": "node scripts/backup.mjs",
     "restore": "node scripts/restore.mjs",
     "build": "tsc -b && vite build",
@@ -15,6 +18,7 @@
   },
   "dependencies": {
     "@ionic/react": "^9.0.0",
+    "argon2": "^0.45.1",
     "dotenv": "^16.5.0",
     "express": "^5.1.0",
     "ionicons": "^8.0.0",
@@ -30,8 +34,8 @@
     "@types/react-dom": "^19.0.0",
     "@vitejs/plugin-react": "^4.4.1",
     "concurrently": "^9.1.2",
-    "typescript": "~5.8.3",
     "tsx": "^4.19.4",
+    "typescript": "~5.8.3",
     "vite": "^6.3.5"
   }
 }

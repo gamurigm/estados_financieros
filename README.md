@@ -6,7 +6,9 @@ Aplicación Ionic con PostgreSQL local. GitHub guarda el código y un respaldo c
 
 1. Instala Docker Desktop y Node.js.
 2. Ejecuta `npm install`.
-3. Ejecuta `npm run local`.
+3. En el primer inicio, ejecuta `npm run db:up` y `npm run db:migrate`.
+4. Ejecuta `npm run owner:create` en una terminal interactiva e ingresa el usuario y la contraseña del propietario. El comando no acepta credenciales como argumentos.
+5. Ejecuta `npm run local` para iniciar la aplicación. Los siguientes inicios aplican cualquier migración pendiente automáticamente.
 
 El primer inicio crea `.env` con una contraseña local aleatoria, inicia PostgreSQL y abre la app en `http://127.0.0.1:5173`. Después de ingresar datos, ejecuta `npm run backup` para crear la primera copia en GitHub.
 
