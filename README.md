@@ -27,3 +27,12 @@ La frase secreta no se guarda en el repositorio. Consérvala fuera de GitHub; si
 ## Datos y acceso
 
 PostgreSQL escucha solo en `127.0.0.1`; no expone la base a la red. La app accede mediante una API local. El volumen de Docker conserva la base en ese equipo. GitHub sincroniza el código y el respaldo cifrado, no la base en vivo.
+
+## Android con React Native
+
+1. Ejecuta `npm install` en la raíz y `npm --prefix mobile install`.
+2. Crea `mobile/.env` con `EXPO_PUBLIC_API_BASE_URL=http://10.0.2.2:3001` para Android Emulator local. Esa URL solo funciona durante desarrollo.
+3. Inicia la API y PostgreSQL con `npm run local`.
+4. En otra terminal, ejecuta `npm --prefix mobile run android` y abre la app en el emulador.
+
+La app usa Expo Router. Guarda solo el refresh token en Expo SecureStore y mantiene el token de acceso en memoria. Para usarla desde cualquier lugar se requiere un API publicado con HTTPS y una URL HTTPS en `EXPO_PUBLIC_API_BASE_URL`; falta elegir y preparar el VPS y el dominio antes de generar el APK privado.

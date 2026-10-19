@@ -2,6 +2,13 @@ node_modules/
 dist/
 *.tsbuildinfo
 .env
+.env.*
+!.env.example
+.expo/
+mobile/android/
+mobile/ios/
+mobile/.env*
+!mobile/.env.example
 backups/*.dump
 backups/*.dump.enc
 image.png
