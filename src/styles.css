@@ -112,6 +112,22 @@ h1 { margin: 0; color: var(--navy); font-size: clamp(25px, 3vw, 34px); letter-sp
 .connection-error { justify-content: space-between; border-color: #efc6b8; background: #fff4ef; color: #8f472e; }
 .connection-error ion-button { flex: 0 0 auto; margin: 0; font-size: 10px; }
 .connection-error code { border-radius: 4px; background: #f5e3dc; padding: 2px 4px; }
+.auth-content { --background: #edf3f5; }
+.auth-loading { min-height: 100%; display: flex; justify-content: center; align-items: center; gap: 10px; color: var(--muted); font-size: 13px; }
+.login-layout { min-height: 100%; display: grid; place-items: center; padding: 24px; }
+.login-card { width: min(440px, 100%); padding: clamp(24px, 6vw, 42px); border: 1px solid #dce7eb; border-radius: 18px; background: white; box-shadow: 0 18px 55px #183a4b12; }
+.login-brand { display: flex; align-items: center; gap: 10px; margin-bottom: 34px; color: #657987; font-size: 9px; font-weight: 750; letter-spacing: .12em; }
+.login-brand .brand-mark { flex: 0 0 auto; }
+.login-kicker { margin-bottom: 8px; }
+.login-card h1 { color: var(--navy); font-size: clamp(25px, 6vw, 31px); }
+.login-description { margin: 9px 0 26px; color: var(--muted); font-size: 13px; line-height: 1.5; }
+.login-form { display: flex; flex-direction: column; gap: 16px; }
+.login-field { display: flex; flex-direction: column; gap: 7px; color: #425b69; font-size: 11px; font-weight: 650; }
+.login-field .form-item { --background: #f7f9fa; min-height: 48px; }
+.login-field ion-input { --padding-top: 12px; --padding-bottom: 12px; font-size: 14px; }
+.login-error { padding: 10px 12px; border: 1px solid #efc6b8; border-radius: 7px; background: #fff4ef; color: #8f472e; font-size: 12px; line-height: 1.45; }
+.login-submit { min-height: 46px; margin: 3px 0 0; --background: var(--navy); --border-radius: 8px; --box-shadow: none; font-size: 13px; font-weight: 650; }
+.login-footnote { margin: 24px 0 0; padding-top: 14px; border-top: 1px solid #e9eff2; color: #7c8b94; font-size: 10px; text-align: center; }
 
 .form-modal { --width: min(480px, calc(100% - 24px)); --height: auto; --max-height: 90%; --border-radius: 14px; --background: white; align-items: center; }
 .form-modal::part(content) { border-radius: 14px; }

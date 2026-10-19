@@ -22,6 +22,7 @@ import {
   chevronForwardOutline,
   closeOutline,
   createOutline,
+  logOutOutline,
   swapHorizontalOutline,
   walletOutline,
 } from 'ionicons/icons';
@@ -44,7 +45,7 @@ type MovementDraft = { id?: string; date: string; kind: 'income' | 'expense'; am
 type TransferDraft = { date: string; amount: string; account: AccountId; toAccount: AccountId; note: string };
 type CellSelection = { date: string; category: Category };
 
-export default function App() {
+export default function App({ onLogout }: { onLogout: () => void }) {
   const [data, setData] = useState<Data>({ categories: [], movements: [], opening: { cash: 0, bank: 0 } });
   const [loading, setLoading] = useState(true);
   const [apiError, setApiError] = useState('');
@@ -74,7 +75,7 @@ export default function App() {
   useEffect(() => {
     let mounted = true;
     loadFinanceState().then((latest) => { if (mounted) setData(latest); }).catch((error: unknown) => {
-      if (mounted) setApiError(error instanceof Error ? error.message : 'No se pudo conectar con PostgreSQL local.');
+      if (mounted) setApiError(error instanceof Error ? error.message : 'No se pudo conectar al servidor.');
     }).finally(() => { if (mounted) setLoading(false); });
     return () => { mounted = false; };
   }, []);
@@ -167,11 +168,12 @@ export default function App() {
               <IonButton fill="outline" className="quiet-button" onClick={() => setCategoryOpen('expense')}><IonIcon slot="start" icon={createOutline} /><span className="action-label">Rubros</span></IonButton>
               <IonButton fill="outline" className="quiet-button" onClick={() => setTransfer({ date: localDate(new Date()), amount: '', account: 'bank', toAccount: 'cash', note: '' })}><IonIcon slot="start" icon={swapHorizontalOutline} /><span className="action-label">Transferir</span></IonButton>
               <IonButton className="add-button" onClick={() => setDraft(makeDraft('expense'))}><IonIcon slot="start" icon={addOutline} /><span className="action-label">Registrar</span></IonButton>
+              <IonButton fill="outline" className="quiet-button" onClick={onLogout}><IonIcon slot="start" icon={logOutOutline} /><span className="action-label">Cerrar sesión</span></IonButton>
             </div>
           </header>
 
-          {loading && <div className="connection-banner"><IonSpinner name="crescent" /> Conectando con PostgreSQL local…</div>}
-          {apiError && <div className="connection-banner connection-error"><span>{apiError} Inicia la base y la API con <code>npm run local</code>.</span><IonButton size="small" fill="outline" onClick={() => { setLoading(true); void refreshData().catch((error: unknown) => setApiError(error instanceof Error ? error.message : 'Error de conexión.')).finally(() => setLoading(false)); }}>Reintentar</IonButton></div>}
+          {loading && <div className="connection-banner"><IonSpinner name="crescent" /> Cargando tus datos…</div>}
+          {apiError && <div className="connection-banner connection-error"><span>{apiError} Comprueba tu conexión e inténtalo de nuevo.</span><IonButton size="small" fill="outline" onClick={() => { setLoading(true); void refreshData().catch((error: unknown) => setApiError(error instanceof Error ? error.message : 'No se pudo conectar al servidor.')).finally(() => setLoading(false)); }}>Reintentar</IonButton></div>}
 
           <section className="month-heading" id="inicio">
             <div>
@@ -220,7 +222,7 @@ export default function App() {
                 </tbody>
               </table>
             </div>
-            <footer className="sheet-footer"><span>Guardado en PostgreSQL local.</span><span><i className="account-dot cash" /> Efectivo <i className="account-dot bank" /> Débito</span></footer>
+            <footer className="sheet-footer"><span>Datos guardados en tu cuenta.</span><span><i className="account-dot cash" /> Efectivo <i className="account-dot bank" /> Débito</span></footer>
           </section>
         </main>
       </IonContent>

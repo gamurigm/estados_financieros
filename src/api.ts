@@ -1,3 +1,5 @@
+import { expireWebSession, getWebAccessToken, refreshWebSession } from './auth';
+
 export type Kind = 'income' | 'expense' | 'transfer';
 export type AccountId = 'cash' | 'bank';
 export type Category = { id: string; name: string; kind: 'income' | 'expense'; active: boolean };
@@ -14,12 +16,32 @@ export type Movement = {
 export type FinanceState = { categories: Category[]; movements: Movement[]; opening: Record<AccountId, number> };
 
 async function request<T>(url: string, options?: RequestInit): Promise<T> {
-  const response = await fetch(url, { headers: { 'Content-Type': 'application/json' }, ...options });
+  let response: Response;
+  try {
+    response = await sendRequest(url, options);
+    if (response.status === 401) {
+      const refreshed = await refreshWebSession();
+      if (refreshed) response = await sendRequest(url, options);
+      if (response.status === 401) expireWebSession();
+    }
+  } catch (error) {
+    if (error instanceof TypeError) throw new Error('No se pudo conectar al servidor. Revisa tu conexión e inténtalo de nuevo.');
+    throw error;
+  }
+
   if (!response.ok) {
     const body = await response.json().catch(() => null);
     throw new Error(body?.error ?? `Error del servidor (${response.status}).`);
   }
   return response.status === 204 ? undefined as T : response.json() as Promise<T>;
+}
+
+function sendRequest(url: string, options?: RequestInit) {
+  const headers = new Headers(options?.headers);
+  headers.set('Content-Type', 'application/json');
+  const accessToken = getWebAccessToken();
+  if (accessToken) headers.set('Authorization', `Bearer ${accessToken}`);
+  return fetch(url, { ...options, headers, credentials: 'same-origin' });
 }
 
 export const loadFinanceState = () => request<FinanceState>('/api/state');
