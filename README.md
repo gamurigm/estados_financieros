@@ -39,7 +39,18 @@ El despliegue requiere un VPS con Docker y un dominio propio. Apunta el dominio 
 
 Caddy solicita y renueva HTTPS automáticamente cuando el dominio resuelve al VPS y los puertos están disponibles. La API aplica migraciones pendientes antes de iniciar. Crea el usuario propietario desde una terminal SSH interactiva con `docker compose --env-file .env.production -f compose.prod.yml exec api npm run owner:create`.
 
-La configuración no se despliega ni migra por sí sola. Antes, selecciona VPS y dominio; después usa `npm run migrate:cloud` y `npm run verify:cloud` siguiendo las instrucciones de respaldo.
+## Respaldos y migración de nube
+
+Configura `CLOUD_SSH_TARGET` como alias de `~/.ssh/config` o `usuario@host`; apunta `CLOUD_REMOTE_DIR` a la carpeta del stack en el VPS. Requiere OpenSSH, GitHub CLI y `origin` privado. Los comandos leen `.env.production` local y no copian la contraseña de cifrado ni credenciales GitHub al VPS.
+
+- `npm run backup:cloud` descarga `pg_dump` por SSH, cifra la copia con AES-256-GCM y publica solo `backup/database.dump.enc` en GitHub. Escribe la misma frase secreta que usas en `npm run backup`.
+- `npm run restore:cloud` pide la frase y la confirmación exacta `REEMPLAZAR PRODUCCION` antes de reemplazar datos en el VPS.
+- `npm run migrate:cloud` cifra y publica una copia local; luego pide `MIGRAR PRODUCCION` antes de enviar esa misma copia al VPS. Conserva el usuario y las sesiones ya creadas en producción.
+- `npm run verify:cloud` compara rubros, saldos iniciales, cantidad de movimientos y saldos calculados hasta la última fecha de origen. No cambies los clientes si la verificación falla.
+
+Los respaldos y migraciones son manuales. No ejecutes restauración en nube salvo que solicites reemplazar los datos de producción.
+
+La configuración no se despliega ni migra por sí sola. Antes, selecciona VPS y dominio; después sigue este flujo.
 
 ## Android con React Native
 
