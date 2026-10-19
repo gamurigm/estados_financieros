@@ -13,7 +13,10 @@ export default function IndexScreen() {
     setMessage('');
     try {
       const active = await sessionManager.restore();
-      if (active) return;
+      if (active) {
+        router.replace('/(tabs)');
+        return;
+      }
       router.replace('/login');
     } catch (error) {
       setMessage(error instanceof Error ? error.message : 'No se pudo conectar al servidor.');

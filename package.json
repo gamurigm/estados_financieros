@@ -10,7 +10,7 @@
     "db:migrate": "node scripts/migrate.mjs",
     "test:server": "tsx --test server/auth-crypto.test.ts server/auth-routes.test.ts",
     "test:web": "tsx --test src/auth.test.ts",
-    "test:mobile": "tsx --test mobile/src/auth/session.test.ts",
+    "test:mobile": "tsx --test mobile/src/auth/session.test.ts mobile/src/features/ledger/selectors.test.ts",
     "owner:create": "tsx scripts/create-owner.mjs",
     "local": "npm run db:up && npm run db:migrate && concurrently -k \"npm run api\" \"npm run dev\"",
     "backup": "node scripts/backup.mjs",

@@ -26,7 +26,7 @@ export default function LoginScreen() {
     setLoading(true);
     try {
       await sessionManager.login(username.trim(), password);
-      router.replace('/');
+      router.replace('/(tabs)');
     } catch (submitError) {
       setError(submitError instanceof Error ? submitError.message : 'No se pudo iniciar sesión.');
     } finally {
