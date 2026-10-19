@@ -28,6 +28,19 @@ La frase secreta no se guarda en el repositorio. Consérvala fuera de GitHub; si
 
 PostgreSQL escucha solo en `127.0.0.1`; no expone la base a la red. La app accede mediante una API local. El volumen de Docker conserva la base en ese equipo. GitHub sincroniza el código y el respaldo cifrado, no la base en vivo.
 
+## Preparar el servicio en la nube
+
+El despliegue requiere un VPS con Docker y un dominio propio. Apunta el dominio al VPS y permite tráfico TCP por los puertos 80 y 443. No publiques los puertos de PostgreSQL ni de la API.
+
+1. Copia `.env.production.example` a `.env.production` y configura `APP_DOMAIN`, `POSTGRES_DB`, `POSTGRES_USER` y `POSTGRES_PASSWORD` fuera de Git.
+2. Usa una contraseña PostgreSQL aleatoria hexadecimal larga; Compose la incorpora a `DATABASE_URL` para el servicio `db`.
+3. Valida la configuración con `docker compose --env-file .env.production -f compose.prod.yml config`.
+4. Inicia el stack con `docker compose --env-file .env.production -f compose.prod.yml up -d --build`.
+
+Caddy solicita y renueva HTTPS automáticamente cuando el dominio resuelve al VPS y los puertos están disponibles. La API aplica migraciones pendientes antes de iniciar. Crea el usuario propietario desde una terminal SSH interactiva con `docker compose --env-file .env.production -f compose.prod.yml exec api npm run owner:create`.
+
+La configuración no se despliega ni migra por sí sola. Antes, selecciona VPS y dominio; después usa `npm run migrate:cloud` y `npm run verify:cloud` siguiendo las instrucciones de respaldo.
+
 ## Android con React Native
 
 1. Ejecuta `npm install` en la raíz y `npm --prefix mobile install`.

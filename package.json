@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "vite",
     "api": "tsx watch server/index.ts",
+    "api:start": "tsx server/index.ts",
     "db:up": "node scripts/prepare-local.mjs && docker compose up -d --wait db",
     "db:migrate": "node scripts/migrate.mjs",
     "test:server": "tsx --test server/auth-crypto.test.ts server/auth-routes.test.ts",
@@ -28,7 +29,8 @@
     "ionicons": "^8.0.0",
     "pg": "^8.15.6",
     "react": "^19.0.0",
-    "react-dom": "^19.0.0"
+    "react-dom": "^19.0.0",
+    "tsx": "^4.19.4"
   },
   "devDependencies": {
     "@types/cookie-parser": "^1.4.10",
@@ -39,7 +41,6 @@
     "@types/react-dom": "^19.0.0",
     "@vitejs/plugin-react": "^4.4.1",
     "concurrently": "^9.1.2",
-    "tsx": "^4.19.4",
     "typescript": "~5.8.3",
     "vite": "^6.3.5"
   }
