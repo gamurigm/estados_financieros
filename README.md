@@ -28,6 +28,18 @@ La frase secreta no se guarda en el repositorio. Consérvala fuera de GitHub; si
 
 PostgreSQL escucha solo en `127.0.0.1`; no expone la base a la red. La app accede mediante una API local. El volumen de Docker conserva la base en ese equipo. GitHub sincroniza el código y el respaldo cifrado, no la base en vivo.
 
+## Acceso Android privado y gratuito con Tailscale
+
+La opción sin VPS ni dominio mantiene la base y la API en esta PC. Instala [Tailscale para Windows](https://tailscale.com/download/windows) y [Android](https://tailscale.com/docs/install/android), e inicia sesión con la misma cuenta personal en ambos dispositivos. En Android, deja Tailscale conectado al usar la app.
+
+1. Inicia PostgreSQL, la API y la web con `npm run local`; deja esa terminal abierta en la PC.
+2. Solo la primera vez, ejecuta `npm run owner:create` en otra terminal y crea el único acceso. No lo ejecutes si el propietario ya existe.
+3. En PowerShell como administrador, ejecuta `tailscale serve --bg 3001`. Tailscale mostrará una URL HTTPS `https://<pc>.<tailnet>.ts.net`, accesible solo desde dispositivos autorizados en tu tailnet. No uses Funnel.
+4. Crea `mobile/.env` con `EXPO_PUBLIC_API_BASE_URL=` seguido de la URL HTTPS exacta que mostró Tailscale.
+5. Genera e instala el APK privado siguiendo la sección Android de este README.
+
+La API sigue enlazada a `127.0.0.1`; Tailscale Serve la publica solo dentro del tailnet y termina HTTPS. PostgreSQL permanece en esta PC y no se publica. La PC y su conexión a internet deben permanecer activas. Si se apaga o `npm run local` termina, Android no podrá conectar.
+
 ## Preparar el servicio en la nube
 
 El despliegue requiere un VPS con Docker y un dominio propio. Apunta el dominio al VPS y permite tráfico TCP por los puertos 80 y 443. No publiques los puertos de PostgreSQL ni de la API.
@@ -59,4 +71,19 @@ La configuración no se despliega ni migra por sí sola. Antes, selecciona VPS y
 3. Inicia la API y PostgreSQL con `npm run local`.
 4. En otra terminal, ejecuta `npm --prefix mobile run android` y abre la app en el emulador.
 
-La app usa Expo Router. Guarda solo el refresh token en Expo SecureStore y mantiene el token de acceso en memoria. Para usarla desde cualquier lugar se requiere un API publicado con HTTPS y una URL HTTPS en `EXPO_PUBLIC_API_BASE_URL`; falta elegir y preparar el VPS y el dominio antes de generar el APK privado.
+### Crear APK privado
+
+Después de configurar `mobile/.env` con la URL HTTPS real, genera el APK desde PowerShell en la raíz del repositorio:
+
+```powershell
+Push-Location mobile
+npx expo prebuild --platform android --no-install
+Push-Location android
+.\gradlew.bat assembleRelease
+Pop-Location
+Pop-Location
+```
+
+El archivo queda en `mobile/android/app/build/outputs/apk/release/app-release.apk`. Copia ese archivo al teléfono e instálalo desde Android. Esta configuración firma el APK con el keystore local de depuración; sirve para uso personal, no para Google Play. Conserva el keystore para poder actualizar la instalación.
+
+La app usa Expo Router. Guarda solo el refresh token en Expo SecureStore y mantiene el token de acceso en memoria. Para el acceso privado desde cualquier lugar, configura primero Tailscale con la sección anterior y usa su URL HTTPS en `EXPO_PUBLIC_API_BASE_URL`. La configuración de VPS descrita arriba queda como alternativa.
