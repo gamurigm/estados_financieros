@@ -1,27 +1,20 @@
-import { useState } from 'react';
-import {
-  ActivityIndicator,
-  KeyboardAvoidingView,
-  Platform,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  View,
-} from 'react-native';
+import { useRef, useState, type ComponentRef } from 'react';
+import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { sessionManager } from '../src/auth/session';
+import { Button, colors, Input, ui } from '../src/ui';
 
 export default function LoginScreen() {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const passwordInput = useRef<ComponentRef<typeof TextInput>>(null);
 
   async function submit() {
-    if (loading) return;
+    if (loading || !username.trim() || !password) return;
     setError('');
     setLoading(true);
     try {
@@ -35,61 +28,62 @@ export default function LoginScreen() {
   }
 
   return (
-    <SafeAreaView style={styles.safeArea}>
-      <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-        <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
-          <View style={styles.brandMark}><Text style={styles.brandInitial}>F</Text></View>
-          <Text style={styles.eyebrow}>FINANZAS PERSONALES</Text>
-          <Text style={styles.title}>Tu dinero, claro.</Text>
-          <Text style={styles.subtitle}>Inicia sesión para ver tu libro financiero.</Text>
+    <SafeAreaView style={ui.screen}>
+      <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
+        <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag">
+          <View style={styles.brand}>
+            <View style={styles.brandMark}><Text style={styles.brandInitial}>f.</Text></View>
+            <Text style={styles.brandName}>Mi libro financiero</Text>
+          </View>
+          <View style={styles.intro}>
+            <Text accessibilityRole="header" style={styles.title}>Tu dinero,{"\n"}en orden.</Text>
+            <Text style={styles.subtitle}>Tus cuentas y movimientos,{"\n"}en un solo lugar.</Text>
+          </View>
 
-          <View style={styles.card}>
-            <Text style={styles.label}>Usuario</Text>
-            <TextInput
+          <View style={ui.card}>
+            <Text style={styles.formTitle}>Iniciar sesión</Text>
+            <Text style={styles.formHint}>Usa tu cuenta de propietario.</Text>
+            <Text style={ui.label}>Usuario</Text>
+            <Input
               accessibilityLabel="Usuario"
               autoCapitalize="none"
               autoCorrect={false}
               autoComplete="username"
+              editable={!loading}
               onChangeText={setUsername}
-              onSubmitEditing={submit}
+              onSubmitEditing={() => passwordInput.current?.focus()}
               placeholder="Tu usuario"
-              placeholderTextColor="#8a928c"
               returnKeyType="next"
-              style={styles.input}
+              submitBehavior="submit"
               textContentType="username"
               value={username}
             />
 
-            <Text style={[styles.label, styles.passwordLabel]}>Contraseña</Text>
-            <TextInput
-              accessibilityLabel="Contraseña"
-              autoCapitalize="none"
-              autoComplete="current-password"
-              onChangeText={setPassword}
-              onSubmitEditing={submit}
-              placeholder="Tu contraseña"
-              placeholderTextColor="#8a928c"
-              returnKeyType="go"
-              secureTextEntry
-              style={styles.input}
-              textContentType="password"
-              value={password}
-            />
-
-            {error ? <Text accessibilityRole="alert" style={styles.error}>{error}</Text> : null}
-
-            <Pressable
-              accessibilityRole="button"
-              accessibilityState={{ disabled: loading }}
-              disabled={loading}
-              onPress={submit}
-              style={({ pressed }) => [styles.button, pressed && !loading && styles.buttonPressed, loading && styles.buttonDisabled]}
-            >
-              {loading ? <ActivityIndicator color="#ffffff" /> : <Text style={styles.buttonText}>Ingresar</Text>}
-            </Pressable>
+            <Text style={ui.label}>Contraseña</Text>
+            <View style={styles.passwordRow}>
+              <Input
+                accessibilityLabel="Contraseña"
+                autoCapitalize="none"
+                autoComplete="current-password"
+                editable={!loading}
+                onChangeText={setPassword}
+                onSubmitEditing={() => void submit()}
+                placeholder="Tu contraseña"
+                ref={passwordInput}
+                returnKeyType="go"
+                secureTextEntry={!showPassword}
+                style={styles.passwordInput}
+                textContentType="password"
+                value={password}
+              />
+              <Pressable accessibilityRole="button" accessibilityLabel={showPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'} onPress={() => setShowPassword((value) => !value)} style={({ pressed }) => [styles.visibility, pressed && ui.pressed]}>
+                <Text style={styles.visibilityText}>{showPassword ? 'Ocultar' : 'Mostrar'}</Text>
+              </Pressable>
+            </View>
+            {error ? <Text accessibilityRole="alert" accessibilityLiveRegion="polite" style={ui.error}>{error}</Text> : null}
+            <Button busy={loading} disabled={!username.trim() || !password} label={loading ? 'Ingresando…' : 'Ingresar'} onPress={() => void submit()} style={styles.submit} />
           </View>
-
-          <Text style={styles.footer}>Acceso privado del propietario</Text>
+          <View style={styles.footer}><View style={styles.privateDot} /><Text style={styles.footerText}>Tu espacio privado de finanzas</Text></View>
         </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
@@ -98,21 +92,22 @@ export default function LoginScreen() {
 
 const styles = StyleSheet.create({
   flex: { flex: 1 },
-  safeArea: { flex: 1, backgroundColor: '#f5f6f2' },
-  scroll: { flexGrow: 1, justifyContent: 'center', paddingHorizontal: 26, paddingVertical: 36 },
-  brandMark: { width: 54, height: 54, borderRadius: 18, backgroundColor: '#173c32', alignItems: 'center', justifyContent: 'center', marginBottom: 29 },
-  brandInitial: { color: '#d5efad', fontSize: 27, fontWeight: '800' },
-  eyebrow: { color: '#47725d', fontSize: 11, fontWeight: '800', letterSpacing: 1.8, marginBottom: 10 },
-  title: { color: '#182a24', fontSize: 34, fontWeight: '800', letterSpacing: -0.8 },
-  subtitle: { color: '#66736c', fontSize: 15, lineHeight: 22, marginTop: 8, marginBottom: 30 },
-  card: { backgroundColor: '#ffffff', borderColor: '#e4e9e2', borderRadius: 22, borderWidth: 1, padding: 21 },
-  label: { color: '#30483b', fontSize: 13, fontWeight: '700', marginBottom: 8 },
-  passwordLabel: { marginTop: 19 },
-  input: { backgroundColor: '#f8faf7', borderColor: '#dce4dc', borderRadius: 13, borderWidth: 1, color: '#182a24', fontSize: 16, height: 52, paddingHorizontal: 14 },
-  error: { color: '#a33d37', fontSize: 13, lineHeight: 19, marginTop: 15 },
-  button: { alignItems: 'center', backgroundColor: '#173c32', borderRadius: 14, height: 53, justifyContent: 'center', marginTop: 23 },
-  buttonPressed: { backgroundColor: '#245644' },
-  buttonDisabled: { opacity: 0.7 },
-  buttonText: { color: '#ffffff', fontSize: 15, fontWeight: '700' },
-  footer: { color: '#78837b', fontSize: 12, marginTop: 24, textAlign: 'center' },
+  scroll: { flexGrow: 1, justifyContent: 'center', paddingHorizontal: 24, paddingVertical: 30 },
+  brand: { alignItems: 'center', flexDirection: 'row', gap: 12 },
+  brandMark: { alignItems: 'center', backgroundColor: colors.ink, borderRadius: 16, height: 48, justifyContent: 'center', width: 48 },
+  brandInitial: { color: colors.accent, fontSize: 30, fontWeight: '800', marginTop: -4 },
+  brandName: { color: colors.ink, fontSize: 15, fontWeight: '700' },
+  intro: { marginBottom: 28, marginTop: 34 },
+  title: { color: colors.ink, fontSize: 44, fontWeight: '800', letterSpacing: -1.8, lineHeight: 49 },
+  subtitle: { color: colors.muted, fontSize: 16, lineHeight: 24, marginTop: 15 },
+  formTitle: { color: colors.ink, fontSize: 21, fontWeight: '800', letterSpacing: -0.4 },
+  formHint: { color: colors.muted, fontSize: 13, marginTop: 5 },
+  passwordRow: { alignItems: 'center', flexDirection: 'row', gap: 6 },
+  passwordInput: { flex: 1, minWidth: 0 },
+  visibility: { alignItems: 'center', justifyContent: 'center', minHeight: 54, minWidth: 64 },
+  visibilityText: { color: colors.primary, fontSize: 13, fontWeight: '700' },
+  submit: { marginTop: 24 },
+  footer: { alignItems: 'center', flexDirection: 'row', gap: 7, justifyContent: 'center', marginTop: 24 },
+  privateDot: { backgroundColor: colors.primary, borderRadius: 3, height: 6, width: 6 },
+  footerText: { color: colors.muted, fontSize: 12 },
 });

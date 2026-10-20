@@ -1,5 +1,6 @@
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
+import { colors } from '../src/ui';
 
 export default function RootLayout() {
   return (
@@ -7,7 +8,7 @@ export default function RootLayout() {
       <StatusBar style="dark" />
       <Stack screenOptions={{
         headerShown: false,
-        contentStyle: { backgroundColor: '#f5f6f2' },
+        contentStyle: { backgroundColor: colors.background },
         animation: 'fade',
       }} />
     </>

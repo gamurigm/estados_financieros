@@ -7,7 +7,6 @@ import {
   ScrollView,
   StyleSheet,
   Text,
-  TextInput,
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -15,6 +14,7 @@ import { router } from 'expo-router';
 import { apiRequest, saveMovement } from '../../src/api/client';
 import type { AccountId, FinanceState } from '../../src/api/contracts';
 import { parseAmount, validateTransfer, type TransferDraft } from '../../src/features/movements/validation';
+import { Button, colors, Input, ScreenHeader, ui } from '../../src/ui';
 
 const accounts: Array<{ id: AccountId; label: string }> = [
   { id: 'cash', label: 'Efectivo' },
@@ -66,26 +66,22 @@ export default function NewTransferScreen() {
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-        <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
-          <View style={styles.header}>
-            <Pressable accessibilityRole="button" accessibilityLabel="Volver" onPress={() => router.back()} style={styles.backButton}><Text style={styles.backIcon}>‹</Text></Pressable>
-            <View><Text style={styles.eyebrow}>ENTRE TUS CUENTAS</Text><Text style={styles.title}>Transferir dinero</Text></View>
-          </View>
+      <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
+        <ScreenHeader title="Transferir dinero" subtitle="Entre tus cuentas" onBack={() => router.back()} />
+        <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag">
           <View style={styles.card}>
             <Text style={styles.helper}>El traslado cambia los saldos, pero no cuenta como ingreso ni gasto.</Text>
-            <Text style={styles.label}>Monto</Text>
-            <TextInput accessibilityLabel="Monto" editable={savedId === null && !saving} keyboardType="decimal-pad" onChangeText={(amount) => { setDraft((current) => ({ ...current, amount })); setError(''); }} placeholder="0.00" placeholderTextColor="#8a928c" style={styles.input} value={draft.amount} />
+            <Text style={styles.label}>Monto (USD)</Text>
+            <Input accessibilityLabel="Monto en dólares" editable={savedId === null && !saving} keyboardType="decimal-pad" onChangeText={(amount) => { setDraft((current) => ({ ...current, amount })); setError(''); }} placeholder="0,00" style={ui.amount} value={draft.amount} />
             <AccountPicker disabled={savedId !== null || saving} label="Desde" value={draft.account} onChange={(account) => { setDraft((current) => ({ ...current, account })); setError(''); }} />
             <AccountPicker disabled={savedId !== null || saving} label="Hacia" value={draft.toAccount} onChange={(toAccount) => { setDraft((current) => ({ ...current, toAccount })); setError(''); }} />
             <Text style={styles.label}>Fecha</Text>
-            <TextInput accessibilityLabel="Fecha" editable={savedId === null && !saving} keyboardType="numbers-and-punctuation" onChangeText={(date) => { setDraft((current) => ({ ...current, date })); setError(''); }} placeholder="AAAA-MM-DD" placeholderTextColor="#8a928c" style={styles.input} value={draft.date} />
+            <Input accessibilityLabel="Fecha" editable={savedId === null && !saving} keyboardType="numbers-and-punctuation" onChangeText={(date) => { setDraft((current) => ({ ...current, date })); setError(''); }} placeholder="AAAA-MM-DD" value={draft.date} />
+            <Text style={styles.dateHint}>Formato: AAAA-MM-DD</Text>
             <Text style={styles.label}>Descripción (opcional)</Text>
-            <TextInput accessibilityLabel="Descripción" editable={savedId === null && !saving} onChangeText={(note) => setDraft((current) => ({ ...current, note }))} placeholder="Agrega un detalle" placeholderTextColor="#8a928c" style={styles.input} value={draft.note} />
-            {error ? <Text accessibilityRole="alert" style={styles.error}>{error}</Text> : null}
-            <Pressable accessibilityRole="button" disabled={saving} onPress={() => void submit()} style={[styles.submitButton, saving && styles.disabled]}>
-              <Text style={styles.submitText}>{saving ? 'Guardando…' : savedId ? 'Actualizar libro' : 'Guardar transferencia'}</Text>
-            </Pressable>
+            <Input accessibilityLabel="Descripción" editable={savedId === null && !saving} onChangeText={(note) => setDraft((current) => ({ ...current, note }))} placeholder="Agrega un detalle" value={draft.note} />
+            {error ? <Text accessibilityRole="alert" accessibilityLiveRegion="polite" style={ui.error}>{error}</Text> : null}
+            <Button busy={saving} label={saving ? 'Guardando…' : savedId ? 'Actualizar libro' : 'Guardar transferencia'} onPress={() => void submit()} style={styles.submitButton} />
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
@@ -101,8 +97,8 @@ function AccountPicker({ label, value, disabled, onChange }: { label: string; va
         {accounts.map((account) => {
           const selected = account.id === value;
           return (
-            <Pressable accessibilityRole="button" accessibilityState={{ selected, disabled }} disabled={disabled} key={account.id} onPress={() => onChange(account.id)} style={[styles.accountOption, selected && styles.accountOptionActive, disabled && styles.disabled]}>
-              <Text style={[styles.accountText, selected && styles.accountTextActive]}>{account.label}</Text>
+            <Pressable accessibilityRole="button" accessibilityState={{ selected, disabled }} disabled={disabled} key={account.id} onPress={() => onChange(account.id)} style={({ pressed }) => [styles.accountOption, selected && styles.accountOptionActive, disabled && ui.disabled, pressed && ui.pressed]}>
+              <Text style={[styles.accountText, selected && styles.accountTextActive]}>{selected ? '✓ ' : ''}{account.label}</Text>
             </Pressable>
           );
         })}
@@ -118,24 +114,16 @@ function localDate() {
 
 const styles = StyleSheet.create({
   flex: { flex: 1 },
-  safeArea: { backgroundColor: '#f5f6f2', flex: 1 },
-  scroll: { paddingHorizontal: 20, paddingBottom: 30, paddingTop: 12 },
-  header: { alignItems: 'center', flexDirection: 'row', marginBottom: 19 },
-  backButton: { alignItems: 'center', backgroundColor: '#e7eee7', borderRadius: 13, height: 42, justifyContent: 'center', marginRight: 12, width: 42 },
-  backIcon: { color: '#315a45', fontSize: 31, lineHeight: 35, marginTop: -2 },
-  eyebrow: { color: '#47725d', fontSize: 10, fontWeight: '800', letterSpacing: 1.5 },
-  title: { color: '#182a24', fontSize: 22, fontWeight: '800', marginTop: 4 },
-  card: { backgroundColor: '#ffffff', borderColor: '#e4e9e2', borderRadius: 20, borderWidth: 1, padding: 17 },
-  helper: { backgroundColor: '#edf4ee', borderRadius: 12, color: '#466354', fontSize: 12, lineHeight: 18, padding: 12 },
-  label: { color: '#30483b', fontSize: 12, fontWeight: '700', marginBottom: 8, marginTop: 17 },
-  input: { backgroundColor: '#f8faf7', borderColor: '#dce4dc', borderRadius: 12, borderWidth: 1, color: '#182a24', fontSize: 15, height: 48, paddingHorizontal: 13 },
+  safeArea: ui.screen,
+  scroll: { ...ui.content, paddingTop: 0 },
+  card: ui.card,
+  helper: { ...ui.helper, backgroundColor: colors.tint, borderRadius: 14, color: colors.primaryPressed, padding: 14 },
+  label: ui.label,
+  dateHint: { ...ui.helper, marginTop: 7 },
   accountRow: { flexDirection: 'row', gap: 8 },
-  accountOption: { alignItems: 'center', backgroundColor: '#f8faf7', borderColor: '#dce4dc', borderRadius: 11, borderWidth: 1, flex: 1, paddingVertical: 12 },
-  accountOptionActive: { backgroundColor: '#e2eee5', borderColor: '#b5d0bd' },
-  accountText: { color: '#6b786f', fontSize: 12, fontWeight: '600' },
-  accountTextActive: { color: '#24533d', fontWeight: '800' },
-  error: { backgroundColor: '#fff0ec', borderRadius: 11, color: '#a33d37', fontSize: 12, lineHeight: 18, marginTop: 15, padding: 10 },
-  submitButton: { alignItems: 'center', backgroundColor: '#173c32', borderRadius: 13, marginTop: 22, paddingVertical: 14 },
-  submitText: { color: '#ffffff', fontSize: 14, fontWeight: '800' },
-  disabled: { opacity: 0.65 },
+  accountOption: { alignItems: 'center', backgroundColor: colors.background, borderColor: colors.border, borderRadius: 13, borderWidth: 2, flex: 1, justifyContent: 'center', minHeight: 52, paddingHorizontal: 8, paddingVertical: 12 },
+  accountOptionActive: { backgroundColor: colors.tint, borderColor: colors.primary },
+  accountText: { color: colors.muted, fontSize: 14, fontWeight: '600' },
+  accountTextActive: { color: colors.primary, fontWeight: '800' },
+  submitButton: { marginTop: 28 },
 });

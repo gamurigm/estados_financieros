@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, Pressable, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, StyleSheet, Text, View } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { apiRequest, deleteMovement, saveMovement } from '../../src/api/client';
 import type { Category, FinanceState, Movement } from '../../src/api/contracts';
 import { MovementForm } from '../../src/features/movements/MovementForm';
 import { parseAmount, type MovementDraft } from '../../src/features/movements/validation';
+import { Button, colors } from '../../src/ui';
 
 export default function EditMovementScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -149,19 +150,17 @@ function toPayload(draft: MovementDraft): Omit<Movement, 'id'> {
 function StateScreen({ message, retry }: { message: string; retry?: () => void }) {
   return (
     <View style={styles.state}>
-      {retry ? null : <ActivityIndicator color="#173c32" />}
+      {retry ? null : <ActivityIndicator color={colors.primary} />}
       <Text style={styles.stateText}>{message}</Text>
-      {retry ? <Pressable onPress={retry} style={styles.retry}><Text style={styles.retryText}>Reintentar</Text></Pressable> : null}
-      <Pressable onPress={() => router.back()} style={styles.back}><Text style={styles.backText}>Volver</Text></Pressable>
+      {retry ? <Button label="Reintentar" onPress={retry} style={styles.retry} /> : null}
+      <Button label="Volver al libro" onPress={() => router.back()} style={styles.back} variant="secondary" />
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  state: { alignItems: 'center', backgroundColor: '#f5f6f2', flex: 1, justifyContent: 'center', padding: 30 },
-  stateText: { color: '#66736c', fontSize: 14, lineHeight: 21, marginTop: 12, textAlign: 'center' },
-  retry: { backgroundColor: '#173c32', borderRadius: 12, marginTop: 18, paddingHorizontal: 20, paddingVertical: 12 },
-  retryText: { color: '#ffffff', fontSize: 13, fontWeight: '700' },
-  back: { marginTop: 16, padding: 10 },
-  backText: { color: '#315e45', fontSize: 13, fontWeight: '700' },
+  state: { alignItems: 'center', backgroundColor: colors.background, flex: 1, justifyContent: 'center', padding: 30 },
+  stateText: { color: colors.muted, fontSize: 15, lineHeight: 23, marginTop: 14, textAlign: 'center' },
+  retry: { marginTop: 24 },
+  back: { marginTop: 12 },
 });
