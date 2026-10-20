@@ -14,7 +14,7 @@ import { router } from 'expo-router';
 import { apiRequest, saveMovement } from '../../src/api/client';
 import type { AccountId, FinanceState } from '../../src/api/contracts';
 import { parseAmount, validateTransfer, type TransferDraft } from '../../src/features/movements/validation';
-import { Button, colors, Input, ScreenHeader, ui } from '../../src/ui';
+import { Button, Input, ScreenHeader, createThemedStyles, GlassPanel } from '../../src/ui';
 
 const accounts: Array<{ id: AccountId; label: string }> = [
   { id: 'cash', label: 'Efectivo' },
@@ -22,6 +22,7 @@ const accounts: Array<{ id: AccountId; label: string }> = [
 ];
 
 export default function NewTransferScreen() {
+  const { ui, styles } = useStyles();
   const [draft, setDraft] = useState<TransferDraft>({
     date: localDate(), amount: '', account: 'cash', toAccount: 'bank', note: '',
   });
@@ -69,7 +70,7 @@ export default function NewTransferScreen() {
       <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
         <ScreenHeader title="Transferir dinero" subtitle="Entre tus cuentas" onBack={() => router.back()} />
         <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag">
-          <View style={styles.card}>
+          <GlassPanel style={styles.card}>
             <Text style={styles.helper}>El traslado cambia los saldos, pero no cuenta como ingreso ni gasto.</Text>
             <Text style={styles.label}>Monto (USD)</Text>
             <Input accessibilityLabel="Monto en dólares" editable={savedId === null && !saving} keyboardType="decimal-pad" onChangeText={(amount) => { setDraft((current) => ({ ...current, amount })); setError(''); }} placeholder="0,00" style={ui.amount} value={draft.amount} />
@@ -82,7 +83,7 @@ export default function NewTransferScreen() {
             <Input accessibilityLabel="Descripción" editable={savedId === null && !saving} onChangeText={(note) => setDraft((current) => ({ ...current, note }))} placeholder="Agrega un detalle" value={draft.note} />
             {error ? <Text accessibilityRole="alert" accessibilityLiveRegion="polite" style={ui.error}>{error}</Text> : null}
             <Button busy={saving} label={saving ? 'Guardando…' : savedId ? 'Actualizar libro' : 'Guardar transferencia'} onPress={() => void submit()} style={styles.submitButton} />
-          </View>
+          </GlassPanel>
         </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
@@ -90,6 +91,7 @@ export default function NewTransferScreen() {
 }
 
 function AccountPicker({ label, value, disabled, onChange }: { label: string; value: AccountId; disabled: boolean; onChange: (account: AccountId) => void }) {
+  const { ui, styles } = useStyles();
   return (
     <View>
       <Text style={styles.label}>{label}</Text>
@@ -112,7 +114,7 @@ function localDate() {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
 }
 
-const styles = StyleSheet.create({
+const useStyles = createThemedStyles(({ colors, ui }) => StyleSheet.create({
   flex: { flex: 1 },
   safeArea: ui.screen,
   scroll: { ...ui.content, paddingTop: 0 },
@@ -126,4 +128,4 @@ const styles = StyleSheet.create({
   accountText: { color: colors.muted, fontSize: 14, fontWeight: '600' },
   accountTextActive: { color: colors.primary, fontWeight: '800' },
   submitButton: { marginTop: 28 },
-});
+}));

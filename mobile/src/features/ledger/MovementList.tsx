@@ -1,7 +1,7 @@
 import { FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
 import type { ReactElement } from 'react';
 import type { Category, Movement } from '../../api/contracts';
-import { colors, ui } from '../../ui';
+import { createThemedStyles } from '../../ui';
 
 const currency = new Intl.NumberFormat('es-EC', { style: 'currency', currency: 'USD' });
 const accountNames = { cash: 'Efectivo', bank: 'Débito' } as const;
@@ -16,6 +16,7 @@ type Props = {
 };
 
 export function MovementList({ movements, categories, header, refreshing, onRefresh, onEditMovement }: Props) {
+  const { styles } = useStyles();
   const recentFirst = [...movements].sort((left, right) => right.date.localeCompare(left.date) || right.id.localeCompare(left.id));
   return (
     <FlatList
@@ -33,6 +34,7 @@ export function MovementList({ movements, categories, header, refreshing, onRefr
 }
 
 function MovementRow({ movement, categories, onPress }: { movement: Movement; categories: Category[]; onPress: () => void }) {
+  const { ui, styles } = useStyles();
   const category = categories.find((item) => item.id === movement.categoryId);
   const title = movement.kind === 'transfer' ? 'Transferencia' : category?.name ?? 'Movimiento';
   const detail = movement.kind === 'transfer'
@@ -71,7 +73,7 @@ function MovementRow({ movement, categories, onPress }: { movement: Movement; ca
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = createThemedStyles(({ colors, ui }) => StyleSheet.create({
   content: { paddingHorizontal: 20, paddingTop: 14, paddingBottom: 28 },
   empty: { backgroundColor: colors.surface, borderRadius: 18, padding: 24 },
   emptyTitle: { color: colors.ink, fontSize: 15, fontWeight: '700' },
@@ -90,4 +92,4 @@ const styles = StyleSheet.create({
   income: { color: colors.primary },
   expense: { color: colors.expense },
   transfer: { color: colors.muted },
-});
+}));

@@ -4,7 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useFocusEffect } from 'expo-router';
 import { loadFinanceState, saveOpeningBalance } from '../src/api/client';
 import type { AccountId, FinanceState } from '../src/api/contracts';
-import { Button, colors, Input, ScreenHeader, ui } from '../src/ui';
+import { Button, Input, ScreenHeader, createThemedStyles, GlassPanel } from '../src/ui';
 
 const accounts: Array<{ id: AccountId; label: string; hint: string }> = [
   { id: 'cash', label: 'Efectivo', hint: 'Saldo inicial de efectivo' },
@@ -12,6 +12,7 @@ const accounts: Array<{ id: AccountId; label: string; hint: string }> = [
 ];
 
 export default function OpeningBalancesScreen() {
+  const { colors, ui, styles } = useStyles();
   const [data, setData] = useState<FinanceState | null>(null);
   const [values, setValues] = useState<Record<AccountId, string>>({ cash: '', bank: '' });
   const [loading, setLoading] = useState(true);
@@ -79,7 +80,7 @@ export default function OpeningBalancesScreen() {
           {data ? <>
             <Text style={styles.intro}>Ingresa el saldo de cada cuenta antes de registrar movimientos.</Text>
             {accounts.map((account) => (
-              <View key={account.id} style={styles.card}>
+              <GlassPanel key={account.id} style={styles.card}>
                 <Text style={styles.label}>{account.label}</Text>
                 <Text style={styles.hint}>{account.hint}</Text>
                 <View style={styles.amountRow}><Text style={styles.currency}>$</Text><Input
@@ -92,7 +93,7 @@ export default function OpeningBalancesScreen() {
                   style={styles.input}
                   value={values[account.id]}
                 /></View>
-              </View>
+              </GlassPanel>
             ))}
             {error ? <Text accessibilityRole="alert" accessibilityLiveRegion="polite" style={ui.error}>{error}</Text> : null}
             <Button busy={saving} disabled={loading} label={saving ? 'Guardando…' : 'Guardar saldos'} onPress={() => void save()} style={styles.primary} />
@@ -110,7 +111,7 @@ function parseBalance(value: string) {
   return Number.isFinite(amount) ? amount : null;
 }
 
-const styles = StyleSheet.create({
+const useStyles = createThemedStyles(({ colors, ui }) => StyleSheet.create({
   safeArea: ui.screen,
   content: { ...ui.content, paddingTop: 0 },
   state: { alignItems: 'center', paddingVertical: 48 },
@@ -123,4 +124,4 @@ const styles = StyleSheet.create({
   currency: { color: colors.primary, fontSize: 28, fontWeight: '700' },
   input: { flex: 1, fontSize: 28, fontWeight: '700', fontVariant: ['tabular-nums'], minHeight: 70 },
   primary: { marginTop: 18 },
-});
+}));

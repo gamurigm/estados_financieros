@@ -1,16 +1,28 @@
-import { Stack } from 'expo-router';
+import { DarkTheme, DefaultTheme, Stack, ThemeProvider as NavigationThemeProvider } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { colors } from '../src/ui';
+import { View } from 'react-native';
+import { CyberBackground, useUi } from '../src/ui';
+import { ThemeProvider } from '../src/theme/ThemeProvider';
 
 export default function RootLayout() {
+  return <ThemeProvider><AppShell /></ThemeProvider>;
+}
+
+function AppShell() {
+  const { colors, mode } = useUi();
+  const baseTheme = mode === 'dark' ? DarkTheme : DefaultTheme;
+  const navigationTheme = { ...baseTheme, colors: { ...baseTheme.colors, background: 'transparent', card: colors.surfaceSolid, text: colors.ink, primary: colors.primary, border: colors.border } };
   return (
-    <>
-      <StatusBar style="dark" />
-      <Stack screenOptions={{
-        headerShown: false,
-        contentStyle: { backgroundColor: colors.background },
-        animation: 'fade',
-      }} />
-    </>
+    <NavigationThemeProvider value={navigationTheme}>
+      <View style={{ flex: 1, backgroundColor: colors.background }}>
+        <CyberBackground />
+        <StatusBar style={mode === 'dark' ? 'light' : 'dark'} />
+        <Stack screenOptions={{
+          headerShown: false,
+          contentStyle: { backgroundColor: 'transparent' },
+          animation: 'fade',
+        }} />
+      </View>
+    </NavigationThemeProvider>
   );
 }

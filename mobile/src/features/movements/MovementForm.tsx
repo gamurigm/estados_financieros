@@ -13,7 +13,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import type { AccountId, Category } from '../../api/contracts';
 import { validateMovement, type MovementDraft } from './validation';
-import { Button, colors, Input, ScreenHeader, ui } from '../../ui';
+import { Button, Input, ScreenHeader, createThemedStyles, GlassPanel } from '../../ui';
 
 const accountOptions: Array<{ id: AccountId; label: string }> = [
   { id: 'cash', label: 'Efectivo' },
@@ -49,6 +49,7 @@ export function MovementForm({
   deleting = false,
   locked = false,
 }: Props) {
+  const { ui, styles } = useStyles();
   const [draft, setDraft] = useState(initialDraft);
   const [validationError, setValidationError] = useState('');
   const [choosingCategory, setChoosingCategory] = useState(false);
@@ -82,7 +83,7 @@ export function MovementForm({
         <ScreenHeader title={title} subtitle="Los detalles de tu movimiento" onBack={onBack} />
         <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag">
 
-          <View style={styles.card}>
+          <GlassPanel style={styles.card}>
             <View style={styles.kindSwitch}>
               <KindButton label="Ingreso" active={draft.kind === 'income'} disabled={locked || submitting || deleting} onPress={() => changeKind('income')} />
               <KindButton label="Gasto" active={draft.kind === 'expense'} disabled={locked || submitting || deleting} onPress={() => changeKind('expense')} />
@@ -174,7 +175,7 @@ export function MovementForm({
                 variant="danger"
               />
             ) : null}
-          </View>
+          </GlassPanel>
         </ScrollView>
       </KeyboardAvoidingView>
       <Modal transparent visible={choosingCategory} onRequestClose={() => setChoosingCategory(false)}>
@@ -209,6 +210,7 @@ export function MovementForm({
 }
 
 function KindButton({ label, active, disabled, onPress }: { label: string; active: boolean; disabled: boolean; onPress: () => void }) {
+  const { ui, styles } = useStyles();
   return (
     <Pressable accessibilityRole="button" accessibilityState={{ selected: active, disabled }} disabled={disabled} onPress={onPress} style={({ pressed }) => [styles.kindButton, active && styles.kindButtonActive, disabled && ui.disabled, pressed && ui.pressed]}>
       <Text style={[styles.kindText, active && styles.kindTextActive]}>{label}</Text>
@@ -216,7 +218,7 @@ function KindButton({ label, active, disabled, onPress }: { label: string; activ
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = createThemedStyles(({ colors, ui }) => StyleSheet.create({
   flex: { flex: 1 },
   safeArea: ui.screen,
   scroll: { ...ui.content, paddingTop: 0 },
@@ -225,13 +227,13 @@ const styles = StyleSheet.create({
   kindButton: ui.segment,
   kindButtonActive: { backgroundColor: colors.primary },
   kindText: ui.segmentText,
-  kindTextActive: { color: colors.surface, fontWeight: '800' },
+  kindTextActive: { color: colors.onPrimary, fontWeight: '800' },
   label: ui.label,
   categorySelect: { alignItems: 'center', backgroundColor: colors.background, borderColor: colors.border, borderRadius: 14, borderWidth: 2, flexDirection: 'row', gap: 10, minHeight: 54, paddingHorizontal: 14, paddingVertical: 14 },
   categoryName: { color: colors.ink, flex: 1, fontSize: 16, fontWeight: '600' },
   changeText: { color: colors.primary, fontSize: 13, fontWeight: '700' },
-  modalBackdrop: { backgroundColor: '#18324688', flex: 1, justifyContent: 'flex-end' },
-  categorySheet: { backgroundColor: colors.surface, borderTopLeftRadius: 26, borderTopRightRadius: 26, maxHeight: '85%', padding: 20 },
+  modalBackdrop: { backgroundColor: 'rgba(3,8,24,0.7)', flex: 1, justifyContent: 'flex-end' },
+  categorySheet: { backgroundColor: colors.surfaceSolid, borderTopLeftRadius: 26, borderTopRightRadius: 26, maxHeight: '85%', padding: 20 },
   sheetHeader: { alignItems: 'center', flexDirection: 'row', flexWrap: 'wrap', gap: 12, justifyContent: 'space-between', marginBottom: 20 },
   categoryRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, paddingBottom: 20 },
   option: { backgroundColor: colors.background, borderColor: colors.border, borderRadius: 13, borderWidth: 2, justifyContent: 'center', minHeight: 48, paddingHorizontal: 12, paddingVertical: 10 },
@@ -245,4 +247,4 @@ const styles = StyleSheet.create({
   accountOptionActive: { backgroundColor: colors.tint, borderColor: colors.primary },
   submitButton: { marginTop: 28 },
   deleteButton: { marginTop: 12 },
-});
+}));

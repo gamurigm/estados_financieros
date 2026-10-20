@@ -4,11 +4,12 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useFocusEffect } from 'expo-router';
 import { loadFinanceState, saveCategories } from '../src/api/client';
 import type { Category, FinanceState } from '../src/api/contracts';
-import { Button, colors, Input, ScreenHeader, ui } from '../src/ui';
+import { Button, Input, ScreenHeader, createThemedStyles, GlassPanel } from '../src/ui';
 
 type CategoryKind = Category['kind'];
 
 export default function CategoriesScreen() {
+  const { colors, ui, styles } = useStyles();
   const [data, setData] = useState<FinanceState | null>(null);
   const [kind, setKind] = useState<CategoryKind>('expense');
   const [newName, setNewName] = useState('');
@@ -83,14 +84,14 @@ export default function CategoriesScreen() {
               <KindButton label="Ingresos" active={kind === 'income'} onPress={() => setKind('income')} />
             </View>
 
-            <View style={styles.card}>
+            <GlassPanel style={styles.card}>
               <Text style={styles.label}>Nuevo rubro</Text>
               <View style={styles.addRow}>
                 <Input accessibilityLabel="Nombre del nuevo rubro" editable={!saving && !loading} onChangeText={setNewName} onSubmitEditing={addCategory} placeholder="Ej. Mascotas" returnKeyType="done" style={styles.addInput} value={newName} />
                 <Button disabled={!newName.trim() || saving || loading} label="Añadir" onPress={addCategory} />
               </View>
               <Text style={styles.saveHint}>Añade o edita rubros y guarda los cambios al terminar.</Text>
-            </View>
+            </GlassPanel>
 
             <Text style={styles.sectionLabel}>{kind === 'income' ? 'Ingresos' : 'Gastos'} ({categories.length})</Text>
             {categories.length ? categories.map((category) => (
@@ -127,6 +128,7 @@ export default function CategoriesScreen() {
 }
 
 function KindButton({ label, active, onPress }: { label: string; active: boolean; onPress: () => void }) {
+  const { ui, styles } = useStyles();
   return <Pressable accessibilityRole="button" accessibilityState={{ selected: active }} onPress={onPress} style={({ pressed }) => [styles.kindButton, active && styles.kindButtonActive, pressed && ui.pressed]}><Text style={[styles.kindText, active && styles.kindTextActive]}>{label}</Text></Pressable>;
 }
 
@@ -137,7 +139,7 @@ function newCategoryId() {
   });
 }
 
-const styles = StyleSheet.create({
+const useStyles = createThemedStyles(({ colors, ui }) => StyleSheet.create({
   safeArea: ui.screen,
   content: { ...ui.content, paddingTop: 0 },
   state: { alignItems: 'center', paddingVertical: 48 },
@@ -154,14 +156,14 @@ const styles = StyleSheet.create({
   saveHint: { ...ui.helper, marginTop: 12 },
   sectionLabel: { color: colors.ink, fontSize: 17, fontWeight: '800', marginBottom: 12 },
   categoryCard: { alignItems: 'center', backgroundColor: colors.surface, borderRadius: 16, flexDirection: 'row', gap: 8, marginBottom: 10, padding: 10 },
-  inactiveCard: { backgroundColor: '#E9EEF1' },
+  inactiveCard: { backgroundColor: colors.inactive },
   categoryInput: { backgroundColor: 'transparent', borderColor: 'transparent', flex: 1, fontSize: 15, fontWeight: '600', minWidth: 0, paddingHorizontal: 8 },
   statusButton: { alignItems: 'center', borderRadius: 12, justifyContent: 'center', minHeight: 48, minWidth: 82, paddingHorizontal: 10, paddingVertical: 10 },
   activeButton: { backgroundColor: colors.tint },
-  inactiveButton: { backgroundColor: '#DEE6EB' },
+  inactiveButton: { backgroundColor: colors.inactive },
   statusText: { fontSize: 12, fontWeight: '700' },
   activeText: { color: colors.primary },
   inactiveText: { color: colors.muted },
   empty: { ...ui.helper, paddingVertical: 20, textAlign: 'center' },
   primary: { marginTop: 14 },
-});
+}));

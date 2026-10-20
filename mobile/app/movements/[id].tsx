@@ -5,7 +5,7 @@ import { apiRequest, deleteMovement, saveMovement } from '../../src/api/client';
 import type { Category, FinanceState, Movement } from '../../src/api/contracts';
 import { MovementForm } from '../../src/features/movements/MovementForm';
 import { parseAmount, type MovementDraft } from '../../src/features/movements/validation';
-import { Button, colors } from '../../src/ui';
+import { Button, createThemedStyles } from '../../src/ui';
 
 export default function EditMovementScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -148,6 +148,7 @@ function toPayload(draft: MovementDraft): Omit<Movement, 'id'> {
 }
 
 function StateScreen({ message, retry }: { message: string; retry?: () => void }) {
+  const { colors, styles } = useStyles();
   return (
     <View style={styles.state}>
       {retry ? null : <ActivityIndicator color={colors.primary} />}
@@ -158,9 +159,9 @@ function StateScreen({ message, retry }: { message: string; retry?: () => void }
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = createThemedStyles(({ colors, ui }) => StyleSheet.create({
   state: { alignItems: 'center', backgroundColor: colors.background, flex: 1, justifyContent: 'center', padding: 30 },
   stateText: { color: colors.muted, fontSize: 15, lineHeight: 23, marginTop: 14, textAlign: 'center' },
   retry: { marginTop: 24 },
   back: { marginTop: 12 },
-});
+}));

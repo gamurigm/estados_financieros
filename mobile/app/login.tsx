@@ -3,9 +3,10 @@ import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { sessionManager } from '../src/auth/session';
-import { Button, colors, Input, ui } from '../src/ui';
+import { Button, Input, createThemedStyles, GlassPanel, ThemeToggle } from '../src/ui';
 
 export default function LoginScreen() {
+  const { ui, styles } = useStyles();
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -34,13 +35,14 @@ export default function LoginScreen() {
           <View style={styles.brand}>
             <View style={styles.brandMark}><Text style={styles.brandInitial}>f.</Text></View>
             <Text style={styles.brandName}>Mi libro financiero</Text>
+            <ThemeToggle />
           </View>
           <View style={styles.intro}>
             <Text accessibilityRole="header" style={styles.title}>Tu dinero,{"\n"}en orden.</Text>
             <Text style={styles.subtitle}>Tus cuentas y movimientos,{"\n"}en un solo lugar.</Text>
           </View>
 
-          <View style={ui.card}>
+          <GlassPanel style={ui.card}>
             <Text style={styles.formTitle}>Iniciar sesión</Text>
             <Text style={styles.formHint}>Usa tu cuenta de propietario.</Text>
             <Text style={ui.label}>Usuario</Text>
@@ -82,7 +84,7 @@ export default function LoginScreen() {
             </View>
             {error ? <Text accessibilityRole="alert" accessibilityLiveRegion="polite" style={ui.error}>{error}</Text> : null}
             <Button busy={loading} disabled={!username.trim() || !password} label={loading ? 'Ingresando…' : 'Ingresar'} onPress={() => void submit()} style={styles.submit} />
-          </View>
+          </GlassPanel>
           <View style={styles.footer}><View style={styles.privateDot} /><Text style={styles.footerText}>Tu espacio privado de finanzas</Text></View>
         </ScrollView>
       </KeyboardAvoidingView>
@@ -90,13 +92,13 @@ export default function LoginScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = createThemedStyles(({ colors, ui }) => StyleSheet.create({
   flex: { flex: 1 },
   scroll: { flexGrow: 1, justifyContent: 'center', paddingHorizontal: 24, paddingVertical: 30 },
   brand: { alignItems: 'center', flexDirection: 'row', gap: 12 },
-  brandMark: { alignItems: 'center', backgroundColor: colors.ink, borderRadius: 16, height: 48, justifyContent: 'center', width: 48 },
+  brandMark: { alignItems: 'center', backgroundColor: colors.tint, borderColor: colors.primary, borderRadius: 16, borderWidth: 1, height: 48, justifyContent: 'center', width: 48, boxShadow: `0px 0px 20px ${colors.glow}` },
   brandInitial: { color: colors.accent, fontSize: 30, fontWeight: '800', marginTop: -4 },
-  brandName: { color: colors.ink, fontSize: 15, fontWeight: '700' },
+  brandName: { color: colors.ink, flex: 1, fontSize: 15, fontWeight: '700' },
   intro: { marginBottom: 28, marginTop: 34 },
   title: { color: colors.ink, fontSize: 44, fontWeight: '800', letterSpacing: -1.8, lineHeight: 49 },
   subtitle: { color: colors.muted, fontSize: 16, lineHeight: 24, marginTop: 15 },
@@ -110,4 +112,4 @@ const styles = StyleSheet.create({
   footer: { alignItems: 'center', flexDirection: 'row', gap: 7, justifyContent: 'center', marginTop: 24 },
   privateDot: { backgroundColor: colors.primary, borderRadius: 3, height: 6, width: 6 },
   footerText: { color: colors.muted, fontSize: 12 },
-});
+}));

@@ -3,9 +3,10 @@ import { ActivityIndicator, Alert, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { sessionManager } from '../src/auth/session';
-import { Button, colors } from '../src/ui';
+import { Button, createThemedStyles } from '../src/ui';
 
 export default function IndexScreen() {
+  const { colors, styles } = useStyles();
   const [message, setMessage] = useState('');
   const [checking, setChecking] = useState(true);
 
@@ -67,13 +68,13 @@ export default function IndexScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  safeArea: { flex: 1, backgroundColor: '#F3F6F8' },
+const useStyles = createThemedStyles(({ colors, ui }) => StyleSheet.create({
+  safeArea: { flex: 1, backgroundColor: 'transparent' },
   center: { flex: 1, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 30 },
-  brandMark: { width: 58, height: 58, borderRadius: 20, backgroundColor: '#183246', alignItems: 'center', justifyContent: 'center', marginBottom: 23 },
-  brandInitial: { color: '#D9ED9A', fontSize: 28, fontWeight: '800' },
-  title: { color: '#183246', fontSize: 25, fontWeight: '800', textAlign: 'center' },
-  muted: { color: '#586F7D', fontSize: 15, lineHeight: 22, marginTop: 10, textAlign: 'center' },
-  button: { alignItems: 'center', backgroundColor: '#183246', borderRadius: 14, marginTop: 25, paddingHorizontal: 24, paddingVertical: 15 },
+  brandMark: { width: 58, height: 58, borderRadius: 20, backgroundColor: colors.tint, alignItems: 'center', justifyContent: 'center', marginBottom: 23 },
+  brandInitial: { color: colors.accent, fontSize: 28, fontWeight: '800' },
+  title: { color: colors.ink, fontSize: 25, fontWeight: '800', textAlign: 'center' },
+  muted: { color: colors.muted, fontSize: 15, lineHeight: 22, marginTop: 10, textAlign: 'center' },
+  button: { alignItems: 'center', backgroundColor: colors.primary, borderRadius: 14, marginTop: 25, paddingHorizontal: 24, paddingVertical: 15 },
   secondary: { marginTop: 18, padding: 10 },
-});
+}));
