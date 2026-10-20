@@ -1,6 +1,6 @@
 # Estados financieros
 
-Aplicación Ionic con PostgreSQL local. GitHub guarda el código y un respaldo cifrado de la base.
+Aplicación Ionic y Android React Native con PostgreSQL. La API puede usar Supabase desde Render o PostgreSQL local con Docker. GitHub guarda el código y un respaldo cifrado de la base.
 
 ## Primer inicio
 
@@ -26,7 +26,18 @@ La frase secreta no se guarda en el repositorio. Consérvala fuera de GitHub; si
 
 ## Datos y acceso
 
-PostgreSQL escucha solo en `127.0.0.1`; no expone la base a la red. La app accede mediante una API local. El volumen de Docker conserva la base en ese equipo. GitHub sincroniza el código y el respaldo cifrado, no la base en vivo.
+En modo local, PostgreSQL escucha solo en `127.0.0.1`; no expone la base a la red. La app accede mediante una API local. El volumen de Docker conserva la base en ese equipo. GitHub sincroniza el código y el respaldo cifrado, no la base en vivo.
+
+## Android con Render y Supabase
+
+La app envía cada alta, edición o eliminación a la API de Render. La API guarda esos cambios directamente en PostgreSQL Supabase; requiere internet.
+
+1. En Render, configura `DATABASE_URL` con la URI Session pooler de Supabase. La URI y su contraseña pertenecen al servidor; mantenlas fuera de Git y de la app móvil.
+2. Configura `mobile/.env` con `EXPO_PUBLIC_API_BASE_URL=https://estados-financieros-c98w.onrender.com`.
+3. En Windows, instala CMake 3.31.6 en el SDK Android y ejecuta `npm run android:release` desde la raíz del repositorio. El comando usa los certificados confiables de Windows y selecciona esa versión de CMake para admitir rutas largas.
+4. Instala `mobile/android/app/build/outputs/apk/release/app-release.apk` en Android e inicia sesión con el propietario migrado.
+
+La URL de la API queda incluida en cada APK. Si cambias `mobile/.env`, genera e instala una APK nueva. Los cambios financieros posteriores se guardan en Supabase sin volver a migrar datos ni publicar código en GitHub.
 
 ## Acceso Android privado y gratuito con Tailscale
 
@@ -76,14 +87,9 @@ La configuración no se despliega ni migra por sí sola. Antes, selecciona VPS y
 Después de configurar `mobile/.env` con la URL HTTPS real, genera el APK desde PowerShell en la raíz del repositorio:
 
 ```powershell
-Push-Location mobile
-npx expo prebuild --platform android --no-install
-Push-Location android
-.\gradlew.bat assembleRelease
-Pop-Location
-Pop-Location
+npm run android:release
 ```
 
 El archivo queda en `mobile/android/app/build/outputs/apk/release/app-release.apk`. Copia ese archivo al teléfono e instálalo desde Android. Esta configuración firma el APK con el keystore local de depuración; sirve para uso personal, no para Google Play. Conserva el keystore para poder actualizar la instalación.
 
-La app usa Expo Router. Guarda solo el refresh token en Expo SecureStore y mantiene el token de acceso en memoria. Para el acceso privado desde cualquier lugar, configura primero Tailscale con la sección anterior y usa su URL HTTPS en `EXPO_PUBLIC_API_BASE_URL`. La configuración de VPS descrita arriba queda como alternativa.
+La app usa Expo Router. Guarda solo el refresh token en Expo SecureStore y mantiene el token de acceso en memoria. Para usar la base online desde cualquier lugar, sigue la sección Render y Supabase. Tailscale y VPS quedan como alternativas.

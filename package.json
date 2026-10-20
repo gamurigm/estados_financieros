@@ -21,6 +21,7 @@
     "restore:cloud": "node scripts/restore-cloud.mjs",
     "migrate:cloud": "node scripts/migrate-cloud.mjs",
     "data:migrate:supabase": "node scripts/migrate-supabase.mjs",
+    "android:release": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/build-android.ps1",
     "verify:cloud": "node scripts/verify-cloud.mjs",
     "build": "tsc -b && vite build",
     "preview": "vite preview"
