@@ -10,10 +10,8 @@ try {
         $env:JAVA_TOOL_OPTIONS = "$previousJavaOptions -Djavax.net.ssl.trustStoreType=Windows-ROOT".Trim()
     }
 
-    if (-not (Test-Path -LiteralPath 'android/gradlew.bat')) {
-        & npx.cmd expo prebuild --platform android --no-install
-        if ($LASTEXITCODE -ne 0) { throw 'No se pudo preparar el proyecto Android.' }
-    }
+    & node .\node_modules\expo\bin\cli prebuild --platform android --no-install
+    if ($LASTEXITCODE -ne 0) { throw 'No se pudo preparar el proyecto Android.' }
 
     # This SDK version includes Ninja with support for long Windows object paths.
     & .\android\gradlew.bat -p android assembleRelease '-Pandroid.cmakeVersion=3.31.6' --max-workers=2 --console=plain

@@ -1,0 +1,11 @@
+# Icono de Estados financieros
+
+Generado con la herramienta integrada `imagegen`. `icon-finance.png` es el icono cuadrado; `icon-foreground.png` conserva transparencia para la capa adaptativa de Android. El fondo adaptativo usa `#081426`.
+
+## Prompt del icono
+
+Create a finished Android launcher app icon for a private personal-finance app called Estados financieros / Mi libro. Square 1024x1024 image, full-bleed opaque background, no device mockup. Visual direction: premium cyber glass, midnight navy (#081426) with a restrained indigo-violet corner gradient, luminous ice cyan and turquoise. One bold, original central monogram: a beautifully constructed lowercase f that also suggests the folded pages of a financial ledger, with a small upward corner cut suggesting financial progress. Sculpted glass-like cyan edges, solid readable core, controlled soft glow, refined dimensional depth, precise clean geometry. The mark must be instantly recognizable and legible at 48 pixels, with no small details, no text, no currency symbols, no floating coins, no decorative chart, no border, no watermark. Keep the complete central mark within the middle 58 percent of the canvas for Android adaptive icon safe-zone cropping. The background continues to every edge; do not bake in rounded outer corners. Balanced, sophisticated, confident, polished shipped-app quality. Deliver just the one square icon.
+
+## Prompt de la capa adaptativa
+
+Edit this app icon to produce the Android adaptive foreground asset. Keep the same distinctive folded-book lowercase f emblem, exactly its silhouette, layered ledger pages, cyan/turquoise/blue glass appearance and restrained cyan glow. Remove the entire navy/indigo background, replacing it with genuine transparent alpha. Recompose on a square canvas so the ENTIRE emblem INCLUDING glow fits within the CENTRAL 54 percent of canvas width AND height, leaving generous fully transparent padding on every side. Center the emblem precisely. This is a production adaptive-icon foreground layer, not a mockup. No rounded square, no circular background, no shadow plane, no lettering added, no checkerboard drawn into the image. Preserve the original emblem design; only remove background and reduce its relative size.
