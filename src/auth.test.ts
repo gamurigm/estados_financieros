@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { beforeEach, test } from 'node:test';
 
-import { clearWebSession, getWebAccessToken, loginWeb, logoutWeb, refreshWebSession } from './auth';
+import { changeWebPassword, clearWebSession, getWebAccessToken, loginWeb, logoutWeb, refreshWebSession } from './auth';
 import { loadFinanceState, saveMovement } from './api';
 
 beforeEach(() => {
@@ -158,6 +158,24 @@ test('finance write reports network loss and never returns a saved movement', as
     /No se pudo conectar al servidor/,
   );
   assert.equal(authorization, 'Bearer write-access');
+});
+
+test('password change sends bearer credentials and clears the web session', async () => {
+  globalThis.fetch = async () => jsonResponse({ accessToken: 'password-access', accessExpiresAt: new Date(Date.now() + 60_000).toISOString() });
+  await loginWeb('owner', 'correct password');
+
+  let requestBody: unknown;
+  let authorization = '';
+  globalThis.fetch = async (_input, init) => {
+    authorization = new Headers(init?.headers).get('authorization') ?? '';
+    requestBody = JSON.parse(String(init?.body));
+    return new Response(null, { status: 204 });
+  };
+  await changeWebPassword('old password', 'new password', 'new password');
+
+  assert.equal(authorization, 'Bearer password-access');
+  assert.deepEqual(requestBody, { currentPassword: 'old password', newPassword: 'new password', confirmPassword: 'new password' });
+  assert.equal(getWebAccessToken(), null);
 });
 
 function jsonResponse(body: unknown, status = 200) {

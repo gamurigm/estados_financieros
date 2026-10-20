@@ -1,21 +1,20 @@
 import { FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
 import type { ReactElement } from 'react';
-import type { Category, Movement } from '../../api/contracts';
+import type { Account, Category, Movement } from '../../api/contracts';
 import { createThemedStyles } from '../../ui';
 
 const currency = new Intl.NumberFormat('es-EC', { style: 'currency', currency: 'USD' });
-const accountNames = { cash: 'Efectivo', bank: 'Débito' } as const;
-
 type Props = {
   movements: Movement[];
   categories: Category[];
+  accounts: Account[];
   header: ReactElement;
   refreshing: boolean;
   onRefresh: () => void;
   onEditMovement: (movement: Movement) => void;
 };
 
-export function MovementList({ movements, categories, header, refreshing, onRefresh, onEditMovement }: Props) {
+export function MovementList({ movements, categories, accounts, header, refreshing, onRefresh, onEditMovement }: Props) {
   const { styles } = useStyles();
   const recentFirst = [...movements].sort((left, right) => right.date.localeCompare(left.date) || right.id.localeCompare(left.id));
   return (
@@ -27,21 +26,25 @@ export function MovementList({ movements, categories, header, refreshing, onRefr
       ListHeaderComponent={header}
       onRefresh={onRefresh}
       refreshing={refreshing}
-      renderItem={({ item }) => <MovementRow movement={item} categories={categories} onPress={() => onEditMovement(item)} />}
+      renderItem={({ item }) => <MovementRow movement={item} categories={categories} accounts={accounts} onPress={() => onEditMovement(item)} />}
       showsVerticalScrollIndicator={false}
     />
   );
 }
 
-function MovementRow({ movement, categories, onPress }: { movement: Movement; categories: Category[]; onPress: () => void }) {
+function MovementRow({ movement, categories, accounts, onPress }: { movement: Movement; categories: Category[]; accounts: Account[]; onPress: () => void }) {
   const { ui, styles } = useStyles();
   const category = categories.find((item) => item.id === movement.categoryId);
-  const title = movement.kind === 'transfer' ? 'Transferencia' : category?.name ?? 'Movimiento';
+  const source = accounts.find((account) => account.id === movement.account);
+  const target = accounts.find((account) => account.id === movement.toAccount);
+  const nameFor = (id: string | undefined) => accounts.find((account) => account.id === id)?.name ?? (id === 'bank' ? 'Débito' : 'Efectivo');
+  const isWithdrawal = movement.kind === 'transfer' && source?.kind === 'bank' && target?.kind === 'cash';
+  const title = movement.kind === 'transfer' ? isWithdrawal ? 'Retiro de efectivo' : 'Transferencia' : category?.name ?? 'Movimiento';
   const detail = movement.kind === 'transfer'
-    ? `${accountNames[movement.account ?? 'cash']} → ${accountNames[movement.toAccount ?? 'bank']}`
+    ? `${nameFor(movement.account)} → ${nameFor(movement.toAccount)}`
     : movement.kind === 'income'
-      ? `A ${accountNames[movement.toAccount ?? 'cash']}`
-      : `Desde ${accountNames[movement.account ?? 'cash']}`;
+      ? `A ${nameFor(movement.toAccount)}`
+      : `Desde ${nameFor(movement.account)}`;
   const dateLabel = new Intl.DateTimeFormat('es-EC', { day: 'numeric', month: 'short' })
     .format(new Date(`${movement.date}T12:00:00`));
   const sign = movement.kind === 'income' ? '+' : movement.kind === 'expense' ? '−' : '';

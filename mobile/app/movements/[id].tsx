@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, StyleSheet, Text, View } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { apiRequest, deleteMovement, saveMovement } from '../../src/api/client';
-import type { Category, FinanceState, Movement } from '../../src/api/contracts';
+import type { Account, Category, FinanceState, Movement } from '../../src/api/contracts';
 import { MovementForm } from '../../src/features/movements/MovementForm';
 import { parseAmount, type MovementDraft } from '../../src/features/movements/validation';
 import { Button, createThemedStyles } from '../../src/ui';
@@ -11,6 +11,7 @@ export default function EditMovementScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const [movement, setMovement] = useState<Movement | null>(null);
   const [categories, setCategories] = useState<Category[]>([]);
+  const [accounts, setAccounts] = useState<Account[]>([]);
   const [draft, setDraft] = useState<MovementDraft | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -33,6 +34,7 @@ export default function EditMovementScreen() {
       }
       setMovement(current);
       setCategories(state.categories);
+      setAccounts(state.accounts);
       setDraft({
         id: current.id,
         date: current.date,
@@ -118,6 +120,7 @@ export default function EditMovementScreen() {
 
   return (
     <MovementForm
+      accounts={accounts}
       categories={categories}
       deleteLabel={deleteConfirmed ? 'Actualizar libro' : 'Eliminar movimiento'}
       deleting={deleting}

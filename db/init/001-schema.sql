@@ -1,9 +1,11 @@
 CREATE EXTENSION IF NOT EXISTS pgcrypto;
 
 CREATE TABLE IF NOT EXISTS accounts (
-  account_key text PRIMARY KEY CHECK (account_key IN ('cash', 'bank')),
+  account_key text PRIMARY KEY,
   name text NOT NULL,
-  opening_balance numeric(14, 2) NOT NULL DEFAULT 0
+  opening_balance numeric(14, 2) NOT NULL DEFAULT 0,
+  account_type text NOT NULL CHECK (account_type IN ('cash', 'bank')),
+  start_date date NOT NULL DEFAULT '1900-01-01'
 );
 
 CREATE TABLE IF NOT EXISTS categories (
@@ -32,9 +34,9 @@ CREATE TABLE IF NOT EXISTS movements (
   )
 );
 
-INSERT INTO accounts (account_key, name) VALUES
-  ('cash', 'Efectivo'),
-  ('bank', 'Banco / débito')
+INSERT INTO accounts (account_key, name, account_type) VALUES
+  ('cash', 'Efectivo', 'cash'),
+  ('bank', 'Banco / débito', 'bank')
 ON CONFLICT (account_key) DO NOTHING;
 
 INSERT INTO categories (name, kind) VALUES

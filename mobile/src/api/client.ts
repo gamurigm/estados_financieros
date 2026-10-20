@@ -1,6 +1,6 @@
 import { getApiBaseUrl } from './config';
 import { sessionManager } from '../auth/session';
-import type { AccountId, Category, FinanceState, Movement } from './contracts';
+import type { Account, AccountId, Category, FinanceState, Movement } from './contracts';
 
 const networkError = 'No se pudo conectar al servidor. Revisa tu conexión e inténtalo de nuevo.';
 
@@ -59,6 +59,14 @@ export function createFinanceRequests(request: ApiRequester) {
       method: 'PUT',
       body: JSON.stringify({ openingBalance }),
     }),
+    saveAccount: (account: Pick<Account, 'id' | 'name' | 'openingBalance'>) => request<void>(`/api/accounts/${encodeURIComponent(account.id)}`, {
+      method: 'PUT',
+      body: JSON.stringify({ name: account.name, openingBalance: account.openingBalance }),
+    }),
+    createBankAccount: (account: { name: string; openingBalance: number; startDate?: string }) => request<Account>('/api/accounts', {
+      method: 'POST',
+      body: JSON.stringify(account),
+    }),
   };
 }
 
@@ -80,6 +88,8 @@ export const saveMovement = financeRequests.saveMovement;
 export const deleteMovement = financeRequests.deleteMovement;
 export const saveCategories = financeRequests.saveCategories;
 export const saveOpeningBalance = financeRequests.saveOpeningBalance;
+export const saveAccount = financeRequests.saveAccount;
+export const createBankAccount = financeRequests.createBankAccount;
 
 async function sendAuthorizedRequest(
   url: string,

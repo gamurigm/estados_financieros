@@ -10,12 +10,6 @@ import { getMonthlySummary } from '../../src/features/ledger/selectors';
 import { Button, createThemedStyles, GlassPanel, ThemeToggle } from '../../src/ui';
 
 const currency = new Intl.NumberFormat('es-EC', { style: 'currency', currency: 'USD' });
-const accountOptions: Array<{ id: 'all' | AccountId; label: string }> = [
-  { id: 'all', label: 'Todas' },
-  { id: 'cash', label: 'Efectivo' },
-  { id: 'bank', label: 'Débito' },
-];
-
 export default function MonthlyLedgerScreen() {
   const { colors, ui, styles } = useStyles();
   const [data, setData] = useState<FinanceState | null>(null);
@@ -79,7 +73,7 @@ export default function MonthlyLedgerScreen() {
         </Pressable>
       </View>
       <View style={[ui.segmented, styles.filters]}>
-        {accountOptions.map((option) => {
+        {[{ id: 'all', label: 'Todas' }, ...(data?.accounts ?? []).map((account) => ({ id: account.id, label: account.name }))].map((option) => {
           const active = filter === option.id;
           return (
             <Pressable
@@ -105,7 +99,7 @@ export default function MonthlyLedgerScreen() {
               <Text style={styles.currencyTag}>USD</Text>
             </View>
             <Text adjustsFontSizeToFit minimumFontScale={0.65} numberOfLines={1} style={[styles.netAmount, summary.net < 0 && styles.negative]}>{currency.format(summary.net)}</Text>
-            <Text style={styles.netHint}>Ingresos menos gastos{filter !== 'all' ? ` en ${filter === 'cash' ? 'efectivo' : 'débito'}` : ''}</Text>
+            <Text style={styles.netHint}>Ingresos menos gastos{filter !== 'all' ? ` en ${data?.accounts.find((account) => account.id === filter)?.name ?? 'esta cuenta'}` : ''}</Text>
             <View style={styles.metricsRow}>
               <Metric label="Ingresos" amount={summary.income} symbol="↙" />
               <View style={styles.metricDivider} />
@@ -116,17 +110,21 @@ export default function MonthlyLedgerScreen() {
           <View style={styles.actionsRow}>
             <ActionButton label="Ingreso" symbol="↙" onPress={() => router.push({ pathname: '/movements/new', params: { kind: 'income' } })} />
             <ActionButton label="Gasto" symbol="↗" primary onPress={() => router.push({ pathname: '/movements/new', params: { kind: 'expense' } })} />
+            <ActionButton label="Retirar" symbol="↓" onPress={() => router.push({ pathname: '/transfers/new', params: { mode: 'withdrawal' } })} />
             <ActionButton label="Transferir" symbol="⇄" onPress={() => router.push('/transfers/new')} />
           </View>
 
           <GlassPanel style={styles.accounts}>
-            <Balance label="Efectivo al cierre" amount={summary.balances.cash} />
+            {(data?.accounts ?? []).filter((account) => account.kind === 'cash').map((account) => <Balance key={account.id} label={`${account.name} al cierre`} amount={summary.balances[account.id] ?? 0} />)}
             <View style={styles.accountDivider} />
-            <Balance label="Débito al cierre" amount={summary.balances.bank} />
+            {(data?.accounts ?? []).filter((account) => account.kind === 'bank').map((account) => <Balance key={account.id} label={`${account.name} al cierre`} amount={summary.balances[account.id] ?? 0} />)}
+            <View style={styles.accountDivider} />
+            <Balance label="Total Débito" amount={summary.debitTotal} />
           </GlassPanel>
           <View style={styles.settingsRow}>
             <Button label="Rubros" onPress={() => router.push('/categories')} style={styles.settingsButton} variant="secondary" />
             <Button label="Saldos iniciales" onPress={() => router.push('/balances')} style={styles.settingsButton} variant="secondary" />
+            <Button label="Cambiar contraseña" onPress={() => router.push('/password')} style={styles.settingsButton} variant="secondary" />
           </View>
         </>
       ) : null}
@@ -159,6 +157,7 @@ export default function MonthlyLedgerScreen() {
   return (
     <SafeAreaView style={ui.screen}>
       <MovementList
+        accounts={data.accounts}
         categories={data.categories}
         header={header}
         movements={summary?.movements ?? []}
@@ -226,7 +225,7 @@ const useStyles = createThemedStyles(({ colors, ui }) => StyleSheet.create({
   monthArrow: { alignItems: 'center', backgroundColor: colors.surface, borderRadius: 14, height: 48, justifyContent: 'center', width: 48 },
   arrowText: { color: colors.ink, fontSize: 32, lineHeight: 36, marginTop: -3 },
   monthText: { color: colors.ink, flex: 1, fontSize: 16, fontWeight: '700', paddingHorizontal: 8, textAlign: 'center' },
-  filters: { marginTop: 8, marginBottom: 12 },
+  filters: { marginTop: 8, marginBottom: 12, flexWrap: 'wrap' },
   netCard: { backgroundColor: colors.hero, borderColor: colors.heroBorder, borderRadius: 24, padding: 18 },
   heroHeading: { alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between' },
   netLabel: { color: colors.heroText, fontSize: 14, fontWeight: '600' },
@@ -239,21 +238,21 @@ const useStyles = createThemedStyles(({ colors, ui }) => StyleSheet.create({
   metricDivider: { backgroundColor: colors.heroBorder, width: 1 },
   metricLabel: { color: colors.heroMuted, fontSize: 12 },
   metricAmount: { color: colors.heroText, fontSize: 18, fontWeight: '700', fontVariant: ['tabular-nums'], marginTop: 5 },
-  actionsRow: { flexDirection: 'row', gap: 10, marginTop: 14 },
-  actionButton: { alignItems: 'center', backgroundColor: colors.surface, borderColor: colors.border, borderRadius: 16, borderWidth: 1, flex: 1, gap: 4, justifyContent: 'center', minHeight: 72, overflow: 'hidden', paddingHorizontal: 6, paddingVertical: 10, boxShadow: `0px 3px 12px ${colors.glow}` },
+  actionsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginTop: 14 },
+  actionButton: { alignItems: 'center', backgroundColor: colors.surface, borderColor: colors.border, borderRadius: 16, borderWidth: 1, flexGrow: 1, gap: 4, justifyContent: 'center', minHeight: 72, overflow: 'hidden', paddingHorizontal: 6, paddingVertical: 10, width: '47%', boxShadow: `0px 3px 12px ${colors.glow}` },
   actionPrimary: { backgroundColor: colors.primary, borderColor: colors.primary },
   actionSymbol: { color: colors.primary, fontSize: 21, fontWeight: '600', lineHeight: 26 },
   actionText: { color: colors.ink, fontSize: 13, fontWeight: '700', textAlign: 'center' },
   actionLight: { color: colors.onPrimary },
   sectionHeading: { alignItems: 'center', flexDirection: 'row', gap: 9, marginBottom: 12, marginTop: 24 },
   sectionTitle: { color: colors.ink, fontSize: 17, fontWeight: '800', letterSpacing: -0.3 },
-  accounts: { backgroundColor: colors.surface, borderRadius: 18, flexDirection: 'row', marginTop: 16, padding: 16 },
-  balance: { flex: 1, justifyContent: 'space-between', minWidth: 0 },
-  accountDivider: { backgroundColor: colors.border, marginHorizontal: 16, width: 1 },
+  accounts: { backgroundColor: colors.surface, borderRadius: 18, marginTop: 16, padding: 16 },
+  balance: { justifyContent: 'space-between', minWidth: 0, paddingVertical: 9 },
+  accountDivider: { backgroundColor: colors.border, height: 1, marginVertical: 5 },
   balanceLabel: { color: colors.muted, fontSize: 13 },
   balanceAmount: { color: colors.ink, fontSize: 19, fontWeight: '700', fontVariant: ['tabular-nums'], marginTop: 7 },
-  settingsRow: { flexDirection: 'row', gap: 10, marginTop: 10 },
-  settingsButton: { flex: 1, minHeight: 48, paddingHorizontal: 8, paddingVertical: 10 },
+  settingsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginTop: 10 },
+  settingsButton: { flexGrow: 1, minHeight: 48, paddingHorizontal: 8, paddingVertical: 10, width: '47%' },
   countBadge: { backgroundColor: colors.input, borderRadius: 9, minWidth: 26, paddingHorizontal: 8, paddingVertical: 4 },
   countText: { color: colors.muted, fontSize: 12, fontWeight: '700' },
 }));

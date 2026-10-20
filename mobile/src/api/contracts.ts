@@ -1,5 +1,6 @@
 export type Kind = 'income' | 'expense' | 'transfer';
-export type AccountId = 'cash' | 'bank';
+export type AccountId = string;
+export type Account = { id: AccountId; name: string; kind: 'cash' | 'bank'; openingBalance: number; startDate: string };
 export type Category = { id: string; name: string; kind: 'income' | 'expense'; active: boolean };
 export type Movement = {
   id: string;
@@ -14,5 +15,6 @@ export type Movement = {
 export type FinanceState = {
   categories: Category[];
   movements: Movement[];
-  opening: Record<AccountId, number>;
+  accounts: Account[];
+  opening: Record<string, number>;
 };

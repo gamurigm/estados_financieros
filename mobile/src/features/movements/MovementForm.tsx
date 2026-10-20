@@ -11,19 +11,15 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import type { AccountId, Category } from '../../api/contracts';
+import type { Account, Category } from '../../api/contracts';
 import { validateMovement, type MovementDraft } from './validation';
 import { Button, Input, ScreenHeader, createThemedStyles, GlassPanel } from '../../ui';
-
-const accountOptions: Array<{ id: AccountId; label: string }> = [
-  { id: 'cash', label: 'Efectivo' },
-  { id: 'bank', label: 'Débito' },
-];
 
 type Props = {
   title: string;
   initialDraft: MovementDraft;
   categories: Category[];
+  accounts: Account[];
   error: string;
   submitLabel: string;
   submitting: boolean;
@@ -39,6 +35,7 @@ export function MovementForm({
   title,
   initialDraft,
   categories,
+  accounts,
   error,
   submitLabel,
   submitting,
@@ -118,7 +115,7 @@ export function MovementForm({
 
             <Text style={styles.label}>{draft.kind === 'income' ? 'Recibir en' : 'Pagar con'}</Text>
             <View style={styles.accountRow}>
-              {accountOptions.map((account) => {
+              {accounts.map((account) => {
                 const selected = draft.account === account.id;
                 return (
                   <Pressable
@@ -129,7 +126,7 @@ export function MovementForm({
                     onPress={() => setDraft((current) => ({ ...current, account: account.id }))}
                     style={({ pressed }) => [styles.accountOption, selected && styles.accountOptionActive, pressed && ui.pressed, (locked || submitting || deleting) && ui.disabled]}
                   >
-                    <Text style={[styles.optionText, selected && styles.optionTextActive]}>{selected ? '✓ ' : ''}{account.label}</Text>
+                    <Text style={[styles.optionText, selected && styles.optionTextActive]}>{selected ? '✓ ' : ''}{account.name}</Text>
                   </Pressable>
                 );
               })}
@@ -242,8 +239,8 @@ const useStyles = createThemedStyles(({ colors, ui }) => StyleSheet.create({
   optionTextActive: { color: colors.primary, fontWeight: '800' },
   helper: ui.helper,
   dateHint: { ...ui.helper, marginTop: 7 },
-  accountRow: { flexDirection: 'row', gap: 8 },
-  accountOption: { alignItems: 'center', backgroundColor: colors.background, borderColor: colors.border, borderRadius: 13, borderWidth: 2, flex: 1, justifyContent: 'center', minHeight: 52, paddingHorizontal: 8, paddingVertical: 12 },
+  accountRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  accountOption: { alignItems: 'center', backgroundColor: colors.background, borderColor: colors.border, borderRadius: 13, borderWidth: 2, flexBasis: '47%', flexGrow: 1, justifyContent: 'center', minHeight: 52, paddingHorizontal: 8, paddingVertical: 12 },
   accountOptionActive: { backgroundColor: colors.tint, borderColor: colors.primary },
   submitButton: { marginTop: 28 },
   deleteButton: { marginTop: 12 },

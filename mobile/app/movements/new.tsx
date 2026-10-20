@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, StyleSheet, Text, View } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { apiRequest, saveMovement } from '../../src/api/client';
-import type { Category, FinanceState, Movement } from '../../src/api/contracts';
+import type { Account, Category, FinanceState, Movement } from '../../src/api/contracts';
 import { MovementForm } from '../../src/features/movements/MovementForm';
 import { parseAmount, type MovementDraft } from '../../src/features/movements/validation';
 import { Button, createThemedStyles } from '../../src/ui';
@@ -11,6 +11,7 @@ export default function NewMovementScreen() {
   const params = useLocalSearchParams<{ kind?: string }>();
   const kind: MovementDraft['kind'] = params.kind === 'income' ? 'income' : 'expense';
   const [categories, setCategories] = useState<Category[] | null>(null);
+  const [accounts, setAccounts] = useState<Account[]>([]);
   const [draft, setDraft] = useState<MovementDraft | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -23,12 +24,13 @@ export default function NewMovementScreen() {
     try {
       const state = await apiRequest<FinanceState>('/api/state');
       setCategories(state.categories);
+      setAccounts(state.accounts);
       setDraft((current) => current ?? {
         date: localDate(),
         kind,
         amount: '',
         categoryId: state.categories.find((item) => item.active && item.kind === kind)?.id ?? '',
-        account: 'cash',
+        account: state.accounts.find((account) => account.kind === 'cash')?.id ?? 'cash',
         note: '',
       });
     } catch (loadError) {
@@ -69,6 +71,7 @@ export default function NewMovementScreen() {
 
   return (
     <MovementForm
+      accounts={accounts}
       categories={categories}
       error={error}
       initialDraft={draft}

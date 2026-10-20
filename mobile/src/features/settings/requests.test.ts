@@ -46,6 +46,24 @@ test('opening balances send the supported cash and bank account keys', async () 
   ]);
 });
 
+test('bank account creation and updates send account details to the shared API', async () => {
+  const requests: CapturedRequest[] = [];
+  const api = createFinanceRequests(createRequester(requests));
+
+  await api.createBankAccount({ name: 'Banco A · 1234', openingBalance: 80.25, startDate: '2026-10-20' });
+  await api.saveAccount({ id: 'bank-id', name: 'Banco B', openingBalance: 20 });
+
+  assert.deepEqual(requests.map(({ url }) => url), [
+    'https://finance.example/api/accounts',
+    'https://finance.example/api/accounts/bank-id',
+  ]);
+  assert.deepEqual(requests.map(({ init }) => init.method), ['POST', 'PUT']);
+  assert.deepEqual(requests.map(({ init }) => JSON.parse(String(init.body))), [
+    { name: 'Banco A · 1234', openingBalance: 80.25, startDate: '2026-10-20' },
+    { name: 'Banco B', openingBalance: 20 },
+  ]);
+});
+
 function createRequester(requests: CapturedRequest[]) {
   const fetcher: typeof fetch = async (input, init = {}) => {
     requests.push({ url: String(input), init });

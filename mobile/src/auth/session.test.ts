@@ -66,6 +66,22 @@ test('logout revokes session and clears secure refresh storage', async () => {
   await assert.rejects(manager.getAccessToken(), /sesión/i);
 });
 
+test('password change uses access token and clears local session', async () => {
+  const storage = memoryStorage();
+  let changedWith = '';
+  const manager = createSessionManager(storage.adapter, fakeAuthApi({
+    login: async () => tokens('password-access', 'password-refresh'),
+    changePassword: async (accessToken: string) => { changedWith = accessToken; },
+  }));
+  await manager.login('owner', 'correct password');
+
+  await manager.changePassword('correct password', 'new password', 'new password');
+
+  assert.equal(changedWith, 'password-access');
+  assert.equal(storage.refreshToken, null);
+  await assert.rejects(manager.getAccessToken(), /sesión venció/i);
+});
+
 test('network failure preserves refresh token for a later retry', async () => {
   const storage = memoryStorage('saved-refresh');
   const manager = createSessionManager(storage.adapter, fakeAuthApi({
@@ -114,6 +130,7 @@ function fakeAuthApi(overrides: Partial<AuthApi> = {}): AuthApi {
     async login() { return tokens('access', 'refresh'); },
     async refresh() { return tokens('refreshed-access', 'refreshed-refresh'); },
     async logout() {},
+    async changePassword() {},
     ...overrides,
   };
 }

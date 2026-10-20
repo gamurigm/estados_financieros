@@ -25,7 +25,10 @@ SELECT jsonb_build_object(
     FROM categories
   ), '[]'::jsonb),
   'accounts', COALESCE((
-    SELECT jsonb_agg(jsonb_build_object('key', account_key, 'openingBalance', opening_balance::text) ORDER BY account_key)
+    SELECT jsonb_agg(jsonb_build_object(
+      'key', account_key, 'name', name, 'kind', account_type,
+      'openingBalance', opening_balance::text, 'startDate', start_date::text
+    ) ORDER BY account_key)
     FROM accounts
   ), '[]'::jsonb),
   'movementCount', (SELECT count(*) FROM movements),
@@ -62,7 +65,13 @@ export async function verifyCloud(options = {}) {
 }
 
 function normalizeAccounts(accounts) {
-  return accounts.map((account) => ({ key: account.key, openingBalance: normalizeAmount(account.openingBalance) }));
+  return accounts.map((account) => ({
+    key: account.key,
+    name: account.name,
+    kind: account.kind,
+    openingBalance: normalizeAmount(account.openingBalance),
+    startDate: account.startDate,
+  }));
 }
 
 function normalizeBalances(balances) {

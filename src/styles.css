@@ -60,6 +60,8 @@ h1 { margin: 0; color: var(--navy); font-size: clamp(25px, 3vw, 34px); letter-sp
 .accounts-summary p { display: flex; justify-content: space-between; align-items: center; margin: 0; min-height: 32px; border-top: 1px solid #e9eff2; font-size: 12px; }
 .accounts-summary p span { display: flex; align-items: center; gap: 7px; color: #536574; }
 .accounts-summary p strong { font-size: 13px; }
+.accounts-summary .debit-total { border-top: 1px solid var(--line); font-weight: 750; }
+.accounts-summary .debit-total strong { color: var(--navy); }
 .account-dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: #22876d; vertical-align: middle; }
 .account-dot.bank { background: #3478b5; }
 .sheet-section { background: var(--paper); border: 1px solid var(--line); border-radius: 12px; overflow: hidden; box-shadow: 0 8px 24px #183a4b0b; }
@@ -126,6 +128,7 @@ h1 { margin: 0; color: var(--navy); font-size: clamp(25px, 3vw, 34px); letter-sp
 .login-field .form-item { --background: #f7f9fa; min-height: 48px; }
 .login-field ion-input { --padding-top: 12px; --padding-bottom: 12px; font-size: 14px; }
 .login-error { padding: 10px 12px; border: 1px solid #efc6b8; border-radius: 7px; background: #fff4ef; color: #8f472e; font-size: 12px; line-height: 1.45; }
+.login-notice { padding: 10px 12px; border: 1px solid #b9ddcc; border-radius: 7px; background: #f0faf5; color: #276b4e; font-size: 12px; line-height: 1.45; }
 .login-submit { min-height: 46px; margin: 3px 0 0; --background: var(--navy); --border-radius: 8px; --box-shadow: none; font-size: 13px; font-weight: 650; }
 .login-footnote { margin: 24px 0 0; padding-top: 14px; border-top: 1px solid #e9eff2; color: #7c8b94; font-size: 10px; text-align: center; }
 

@@ -27,6 +27,7 @@ export type AuthApi = {
   login(username: string, password: string): Promise<TokenResponse>;
   refresh(refreshToken: string): Promise<TokenResponse>;
   logout(refreshToken: string): Promise<void>;
+  changePassword(accessToken: string, currentPassword: string, newPassword: string, confirmPassword: string): Promise<void>;
 };
 
 export class AuthApiError extends Error {
@@ -42,6 +43,7 @@ export type SessionManager = {
   refresh(): Promise<boolean>;
   getAccessToken(): Promise<string>;
   logout(): Promise<void>;
+  changePassword(currentPassword: string, newPassword: string, confirmPassword: string): Promise<void>;
 };
 
 export function createSecureTokenStorage(secureStore: SecureStoreAdapter): SecureTokenStorage {
@@ -132,6 +134,21 @@ export function createSessionManager(storage: SecureTokenStorage, authApi: AuthA
     return accessToken;
   }
 
+  async function changePassword(currentPassword: string, newPassword: string, confirmPassword: string) {
+    const token = await getAccessToken();
+    try {
+      await authApi.changePassword(token, currentPassword, newPassword, confirmPassword);
+    } catch (error) {
+      if (error instanceof AuthApiError && error.status === 401) {
+        clearAccessToken();
+        await storage.clearRefreshToken();
+      }
+      throw error;
+    }
+    clearAccessToken();
+    await storage.clearRefreshToken();
+  }
+
   function logout(): Promise<void> {
     if (!logoutInFlight) {
       logoutStarting = true;
@@ -153,7 +170,7 @@ export function createSessionManager(storage: SecureTokenStorage, authApi: AuthA
     if (token) await authApi.logout(token);
   }
 
-  return { login, restore, refresh, getAccessToken, logout };
+  return { login, restore, refresh, getAccessToken, logout, changePassword };
 }
 
 const secureStoreAdapter: SecureStoreAdapter = {
@@ -178,6 +195,10 @@ const authApi: AuthApi = {
     const response = await sendAuth('/logout', { refreshToken, client: 'android' });
     if (!response.ok) throw await responseError(response);
   },
+  async changePassword(accessToken, currentPassword, newPassword, confirmPassword) {
+    const response = await sendAuth('/password', { currentPassword, newPassword, confirmPassword }, accessToken);
+    if (!response.ok) throw await responseError(response);
+  },
 };
 
 export const sessionManager = createSessionManager(createSecureTokenStorage(secureStoreAdapter), authApi);
@@ -190,11 +211,14 @@ async function requestAuth(path: string, body: Record<string, string>) {
   return payload;
 }
 
-async function sendAuth(path: string, body: Record<string, string>) {
+async function sendAuth(path: string, body: Record<string, string>, accessToken?: string) {
   try {
     return await fetch(`${getApiBaseUrl()}/api/auth${path}`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
+      },
       body: JSON.stringify(body),
     });
   } catch (error) {

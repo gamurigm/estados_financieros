@@ -45,6 +45,29 @@ export async function loginWeb(username: string, password: string): Promise<void
   accessToken = body.accessToken;
 }
 
+export async function changeWebPassword(currentPassword: string, newPassword: string, confirmPassword: string): Promise<void> {
+  let response: Response;
+  try {
+    response = await fetch('/api/auth/password', {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${accessToken ?? ''}`,
+      },
+      body: JSON.stringify({ currentPassword, newPassword, confirmPassword }),
+    });
+  } catch {
+    throw new Error(networkError);
+  }
+
+  if (!response.ok) {
+    if (response.status === 401) expireWebSession();
+    throw await responseError(response);
+  }
+  clearWebSession();
+}
+
 export function refreshWebSession(): Promise<boolean> {
   if (logoutStarting) return Promise.resolve(false);
   if (!refreshInFlight) {

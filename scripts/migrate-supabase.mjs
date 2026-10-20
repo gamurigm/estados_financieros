@@ -56,8 +56,8 @@ try {
       if (currentData.movements.length !== 0) throw new Error('Supabase ya recibió movimientos. No se reemplazaron.');
 
       await destination.query('DELETE FROM public.categories');
-      await insertRows(destination, 'accounts', ['account_key', 'name', 'opening_balance'], sourceData.accounts,
-        'ON CONFLICT (account_key) DO UPDATE SET name = EXCLUDED.name, opening_balance = EXCLUDED.opening_balance');
+      await insertRows(destination, 'accounts', ['account_key', 'name', 'opening_balance', 'account_type', 'start_date'], sourceData.accounts,
+        'ON CONFLICT (account_key) DO UPDATE SET name = EXCLUDED.name, opening_balance = EXCLUDED.opening_balance, account_type = EXCLUDED.account_type, start_date = EXCLUDED.start_date');
       await insertRows(destination, 'categories', ['id', 'name', 'kind', 'active', 'created_at'], sourceData.categories);
       await insertRows(destination, 'movements', ['id', 'movement_date', 'kind', 'amount', 'category_id', 'account_key', 'to_account_key', 'note', 'created_at'], sourceData.movements);
 
@@ -88,7 +88,8 @@ try {
 
 async function readFinance(client) {
   const [accounts, categories, movements] = await Promise.all([
-    client.query(`SELECT account_key, name, opening_balance::text AS opening_balance
+    client.query(`SELECT account_key, name, opening_balance::text AS opening_balance,
+        account_type, start_date::text AS start_date
       FROM public.accounts ORDER BY account_key`),
     client.query(`SELECT id, name, kind, active,
         to_char(created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"') AS created_at

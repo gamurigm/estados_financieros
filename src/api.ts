@@ -1,7 +1,8 @@
 import { expireWebSession, getWebAccessToken, refreshWebSession } from './auth';
 
 export type Kind = 'income' | 'expense' | 'transfer';
-export type AccountId = 'cash' | 'bank';
+export type AccountId = string;
+export type Account = { id: AccountId; name: string; kind: 'cash' | 'bank'; openingBalance: number; startDate: string };
 export type Category = { id: string; name: string; kind: 'income' | 'expense'; active: boolean };
 export type Movement = {
   id: string;
@@ -13,7 +14,7 @@ export type Movement = {
   toAccount?: AccountId;
   note: string;
 };
-export type FinanceState = { categories: Category[]; movements: Movement[]; opening: Record<AccountId, number> };
+export type FinanceState = { categories: Category[]; movements: Movement[]; accounts: Account[]; opening: Record<string, number> };
 
 async function request<T>(url: string, options?: RequestInit): Promise<T> {
   let response: Response;
@@ -49,3 +50,5 @@ export const saveMovement = (movement: Omit<Movement, 'id'> & { id?: string }) =
 export const deleteMovement = (id: string) => request<void>(`/api/movements/${id}`, { method: 'DELETE' });
 export const saveCategories = (categories: Category[]) => request<void>('/api/categories', { method: 'PUT', body: JSON.stringify(categories) });
 export const saveOpeningBalance = (account: AccountId, openingBalance: number) => request<void>(`/api/accounts/${account}`, { method: 'PUT', body: JSON.stringify({ openingBalance }) });
+export const saveAccount = (account: Pick<Account, 'id' | 'name' | 'openingBalance'>) => request<void>(`/api/accounts/${encodeURIComponent(account.id)}`, { method: 'PUT', body: JSON.stringify({ name: account.name, openingBalance: account.openingBalance }) });
+export const createBankAccount = (account: { name: string; openingBalance: number; startDate?: string }) => request<Account>('/api/accounts', { method: 'POST', body: JSON.stringify(account) });

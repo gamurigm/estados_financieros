@@ -5,6 +5,7 @@ export type MonthlySummary = {
   expenses: number;
   net: number;
   balances: Record<AccountId, number>;
+  debitTotal: number;
   movements: Movement[];
 };
 
@@ -26,14 +27,19 @@ export function getMonthlySummary(
     .filter((movement) => movement.kind === 'expense')
     .reduce((sum, movement) => sum + movement.amount, 0);
 
+  const balances = Object.fromEntries(state.accounts.map((account) => [
+    account.id,
+    getAccountBalance(state, account.id, monthEnd),
+  ]));
+
   return {
     income,
     expenses,
     net: income - expenses,
-    balances: {
-      cash: getAccountBalance(state, 'cash', monthEnd),
-      bank: getAccountBalance(state, 'bank', monthEnd),
-    },
+    balances,
+    debitTotal: state.accounts
+      .filter((account) => account.kind === 'bank')
+      .reduce((total, account) => total + balances[account.id], 0),
     movements,
   };
 }
@@ -55,12 +61,14 @@ function matchesAccount(movement: Movement, filter: 'all' | AccountId) {
 }
 
 function getAccountBalance(state: FinanceState, account: AccountId, monthEnd: string) {
+  const accountRecord = state.accounts.find((item) => item.id === account);
+  if (!accountRecord || monthEnd < accountRecord.startDate) return 0;
   return state.movements.reduce((balance, movement) => {
-    if (movement.date > monthEnd) return balance;
+    if (movement.date < accountRecord.startDate || movement.date > monthEnd) return balance;
     if (movement.kind === 'income' && movement.toAccount === account) return balance + movement.amount;
     if (movement.kind === 'expense' && movement.account === account) return balance - movement.amount;
     if (movement.kind === 'transfer' && movement.account === account) return balance - movement.amount;
     if (movement.kind === 'transfer' && movement.toAccount === account) return balance + movement.amount;
     return balance;
-  }, state.opening[account] ?? 0);
+  }, accountRecord.openingBalance);
 }

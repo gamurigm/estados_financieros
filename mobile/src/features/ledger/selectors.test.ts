@@ -71,8 +71,40 @@ test('transfers change account balances but not income or expense totals', () =>
   assert.deepEqual(summary.balances, { cash: 65, bank: 50 });
 });
 
+test('debit balance sums every bank and ignores balances before an account start date', () => {
+  const data = {
+    ...state([
+      movement({ id: 'legacy-income', kind: 'income', date: '2026-01-20', amount: 5, toAccount: 'bank' }),
+      movement({ id: 'second-bank-before-open', kind: 'income', date: '2026-01-20', amount: 999, toAccount: 'bank-2' as AccountId }),
+      movement({ id: 'second-bank-income', kind: 'income', date: '2026-02-10', amount: 20, toAccount: 'bank-2' as AccountId }),
+      movement({ id: 'withdrawal', kind: 'transfer', amount: 10, account: 'bank', toAccount: 'cash' }),
+    ], { cash: 20, bank: 30 }),
+    accounts: [
+      { id: 'cash', name: 'Efectivo', kind: 'cash', openingBalance: 20, startDate: '1900-01-01' },
+      { id: 'bank', name: 'Banco principal', kind: 'bank', openingBalance: 30, startDate: '1900-01-01' },
+      { id: 'bank-2', name: 'Banco secundario', kind: 'bank', openingBalance: 50, startDate: '2026-02-01' },
+    ],
+  } as FinanceState;
+
+  const january = getMonthlySummary(data, '2026-01', 'all') as ReturnType<typeof getMonthlySummary> & { debitTotal: number };
+  const february = getMonthlySummary(data, '2026-02', 'all') as ReturnType<typeof getMonthlySummary> & { debitTotal: number };
+
+  assert.equal(january.balances.cash, 20);
+  assert.equal(january.debitTotal, 35);
+  assert.deepEqual(february.balances, { cash: 30, bank: 25, 'bank-2': 70 });
+  assert.equal(february.debitTotal, 95);
+  assert.equal(february.income, 20);
+  assert.equal(february.expenses, 0);
+});
+
 function state(movements: Movement[], opening: Record<AccountId, number> = { cash: 0, bank: 0 }): FinanceState {
-  return { categories: [], movements, opening };
+  return {
+    categories: [], movements, opening,
+    accounts: [
+      { id: 'cash', name: 'Efectivo', kind: 'cash', openingBalance: opening.cash ?? 0, startDate: '1900-01-01' },
+      { id: 'bank', name: 'Banco / débito', kind: 'bank', openingBalance: opening.bank ?? 0, startDate: '1900-01-01' },
+    ],
+  };
 }
 
 function movement(input: Partial<Movement> & Pick<Movement, 'id'>): Movement {

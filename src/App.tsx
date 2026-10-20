@@ -23,39 +23,43 @@ import {
   closeOutline,
   createOutline,
   logOutOutline,
+  lockClosedOutline,
   swapHorizontalOutline,
   walletOutline,
 } from 'ionicons/icons';
-import { deleteMovement as deleteMovementRequest, loadFinanceState, saveCategories as saveCategoriesRequest, saveMovement as saveMovementRequest, saveOpeningBalance } from './api';
-import type { AccountId, Category, FinanceState as Data } from './api';
-
-const accounts: { id: AccountId; name: string }[] = [
-  { id: 'cash', name: 'Efectivo' },
-  { id: 'bank', name: 'Débito · cuenta bancaria' },
-];
+import { changeWebPassword } from './auth';
+import { createBankAccount, deleteMovement as deleteMovementRequest, loadFinanceState, saveAccount, saveCategories as saveCategoriesRequest, saveMovement as saveMovementRequest, saveOpeningBalance } from './api';
+import type { Account, AccountId, Category, FinanceState as Data } from './api';
 
 const money = new Intl.NumberFormat('es-EC', { style: 'currency', currency: 'USD', minimumFractionDigits: 2 });
 const localDate = (date: Date) => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
 const dateForMonth = (month: string, day: number) => `${month}-${String(day).padStart(2, '0')}`;
 const isWeekend = (date: string) => [0, 6].includes(new Date(`${date}T12:00:00`).getDay());
 const monthLabel = (month: string) => new Intl.DateTimeFormat('es-EC', { month: 'long', year: 'numeric' }).format(new Date(`${month}-01T12:00:00`));
-const accountName = (id?: AccountId) => accounts.find((account) => account.id === id)?.name ?? '';
+const accountName = (id: AccountId | undefined, accounts: Account[]) => accounts.find((account) => account.id === id)?.name ?? '';
 
 type MovementDraft = { id?: string; date: string; kind: 'income' | 'expense'; amount: string; categoryId: string; account: AccountId; note: string };
 type TransferDraft = { date: string; amount: string; account: AccountId; toAccount: AccountId; note: string };
 type CellSelection = { date: string; category: Category };
 
-export default function App({ onLogout }: { onLogout: () => void }) {
-  const [data, setData] = useState<Data>({ categories: [], movements: [], opening: { cash: 0, bank: 0 } });
+export default function App({ onLogout, onPasswordChanged }: { onLogout: () => void; onPasswordChanged: () => void }) {
+  const [data, setData] = useState<Data>({ categories: [], movements: [], accounts: [], opening: { cash: 0, bank: 0 } });
   const [loading, setLoading] = useState(true);
   const [apiError, setApiError] = useState('');
   const [month, setMonth] = useState(localDate(new Date()).slice(0, 7));
   const [filter, setFilter] = useState<'all' | AccountId>('all');
   const [draft, setDraft] = useState<MovementDraft | null>(null);
   const [transfer, setTransfer] = useState<TransferDraft | null>(null);
+  const [transferMode, setTransferMode] = useState<'transfer' | 'withdrawal'>('transfer');
   const [categoryOpen, setCategoryOpen] = useState<'income' | 'expense' | null>(null);
   const [balanceOpen, setBalanceOpen] = useState(false);
-  const [openingDraft, setOpeningDraft] = useState<Record<AccountId, number>>({ cash: 0, bank: 0 });
+  const [accountDrafts, setAccountDrafts] = useState<Record<AccountId, { name: string; balance: string }>>({});
+  const [newAccountName, setNewAccountName] = useState('');
+  const [newAccountBalance, setNewAccountBalance] = useState('0');
+  const [passwordOpen, setPasswordOpen] = useState(false);
+  const [passwordDraft, setPasswordDraft] = useState({ current: '', next: '', confirm: '' });
+  const [passwordError, setPasswordError] = useState('');
+  const [passwordSaving, setPasswordSaving] = useState(false);
   const [cell, setCell] = useState<CellSelection | null>(null);
   const [toast, setToast] = useState('');
   const activeCategories = data.categories.filter((category) => category.active);
@@ -65,6 +69,7 @@ export default function App({ onLogout }: { onLogout: () => void }) {
   const incomeTotal = visibleMovements.filter((movement) => movement.kind === 'income').reduce((sum, movement) => sum + movement.amount, 0);
   const expenseTotal = visibleMovements.filter((movement) => movement.kind === 'expense').reduce((sum, movement) => sum + movement.amount, 0);
   const monthEnd = dateForMonth(month, days);
+  const bankAccounts = data.accounts.filter((account) => account.kind === 'bank');
 
   const refreshData = async () => {
     const latest = await loadFinanceState();
@@ -90,14 +95,18 @@ export default function App({ onLogout }: { onLogout: () => void }) {
     }
   };
 
-  const balanceAt = (account: AccountId) => data.movements.reduce((balance, movement) => {
-    if (movement.date > monthEnd) return balance;
-    if (movement.kind === 'income' && movement.toAccount === account) return balance + movement.amount;
-    if (movement.kind === 'expense' && movement.account === account) return balance - movement.amount;
-    if (movement.kind === 'transfer' && movement.account === account) return balance - movement.amount;
-    if (movement.kind === 'transfer' && movement.toAccount === account) return balance + movement.amount;
+  const balanceAt = (accountId: AccountId) => {
+    const account = data.accounts.find((item) => item.id === accountId);
+    if (!account || account.startDate > monthEnd) return 0;
+    return data.movements.reduce((balance, movement) => {
+    if (movement.date < account.startDate || movement.date > monthEnd) return balance;
+    if (movement.kind === 'income' && movement.toAccount === accountId) return balance + movement.amount;
+    if (movement.kind === 'expense' && movement.account === accountId) return balance - movement.amount;
+    if (movement.kind === 'transfer' && movement.account === accountId) return balance - movement.amount;
+    if (movement.kind === 'transfer' && movement.toAccount === accountId) return balance + movement.amount;
     return balance;
-  }, data.opening[account] ?? 0);
+    }, account.openingBalance);
+  };
 
   const totalForCell = (categoryId: string, date: string) => visibleMovements
     .filter((movement) => movement.date === date && movement.categoryId === categoryId)
@@ -108,7 +117,7 @@ export default function App({ onLogout }: { onLogout: () => void }) {
     kind,
     amount: '',
     categoryId: categoryId || activeCategories.find((category) => category.kind === kind)?.id || '',
-    account: 'cash',
+    account: data.accounts[0]?.id ?? 'cash',
     note: '',
   });
 
@@ -131,7 +140,7 @@ export default function App({ onLogout }: { onLogout: () => void }) {
   const saveTransfer = async () => {
     if (!transfer || !transfer.amount || Number(transfer.amount) <= 0 || transfer.account === transfer.toAccount) return;
     const movement = { date: transfer.date, kind: 'transfer' as const, amount: Number(transfer.amount), account: transfer.account, toAccount: transfer.toAccount, note: transfer.note.trim() };
-    await runChange(() => saveMovementRequest(movement), 'Transferencia guardada');
+    await runChange(() => saveMovementRequest(movement), transferMode === 'withdrawal' ? 'Retiro guardado' : 'Transferencia guardada');
     setTransfer(null);
   };
 
@@ -144,8 +153,57 @@ export default function App({ onLogout }: { onLogout: () => void }) {
   };
 
   const saveBalances = async () => {
-    await runChange(() => Promise.all(accounts.map((account) => saveOpeningBalance(account.id, openingDraft[account.id]))), 'Saldos iniciales guardados');
-    setBalanceOpen(false);
+    if (newAccountName.trim() && (!newAccountBalance.trim() || !Number.isFinite(Number(newAccountBalance)))) {
+      setToast('Revisa el saldo de la nueva cuenta.');
+      return;
+    }
+    try {
+      await Promise.all(data.accounts.map((account) => {
+        const draft = accountDrafts[account.id] ?? { name: account.name, balance: String(account.openingBalance) };
+        const openingBalance = draft.balance.trim() ? Number(draft.balance) : Number.NaN;
+        if (!Number.isFinite(openingBalance)) throw new Error(`Revisa el saldo de ${account.name}.`);
+        return account.kind === 'cash'
+          ? saveOpeningBalance(account.id, openingBalance)
+          : saveAccount({ id: account.id, name: draft.name, openingBalance });
+      }));
+      if (newAccountName.trim()) await createBankAccount({ name: newAccountName.trim(), openingBalance: Number(newAccountBalance), startDate: localDate(new Date()) });
+      await refreshData();
+      setNewAccountName('');
+      setNewAccountBalance('0');
+      setBalanceOpen(false);
+      setToast('Cuentas guardadas');
+    } catch (error) {
+      await refreshData().catch(() => undefined);
+      setToast(error instanceof Error ? error.message : 'No se pudieron guardar las cuentas.');
+    }
+  };
+
+  const changePassword = async () => {
+    setPasswordSaving(true);
+    setPasswordError('');
+    try {
+      await changeWebPassword(passwordDraft.current, passwordDraft.next, passwordDraft.confirm);
+      setPasswordOpen(false);
+      onPasswordChanged();
+    } catch (error) {
+      setPasswordError(error instanceof Error ? error.message : 'No se pudo cambiar la contraseña.');
+    } finally {
+      setPasswordSaving(false);
+    }
+  };
+
+  const startTransfer = () => {
+    setTransferMode('transfer');
+    setTransfer({ date: localDate(new Date()), amount: '', account: data.accounts[0]?.id ?? 'cash', toAccount: bankAccounts[0]?.id ?? 'bank', note: '' });
+  };
+
+  const startWithdrawal = () => {
+    if (!bankAccounts.length) {
+      setToast('Agrega una cuenta bancaria antes de retirar.');
+      return;
+    }
+    setTransferMode('withdrawal');
+    setTransfer({ date: localDate(new Date()), amount: '', account: bankAccounts[0].id, toAccount: data.accounts.find((account) => account.kind === 'cash')?.id ?? 'cash', note: '' });
   };
 
   const moveMonth = (offset: number) => {
@@ -164,10 +222,12 @@ export default function App({ onLogout }: { onLogout: () => void }) {
             <a className="brand-mark" href="#inicio" aria-label="Estados financieros"><span>ef</span></a>
             <div className="brand-copy"><strong>Estados financieros</strong><span>Tu mes, claro y en orden</span></div>
             <div className="top-actions">
-              <IonButton fill="outline" className="quiet-button" onClick={() => { setOpeningDraft(data.opening); setBalanceOpen(true); }}><IonIcon slot="start" icon={walletOutline} /><span className="action-label">Saldos iniciales</span></IonButton>
+              <IonButton fill="outline" className="quiet-button" onClick={() => { setAccountDrafts(Object.fromEntries(data.accounts.map((account) => [account.id, { name: account.name, balance: String(account.openingBalance) }]))); setBalanceOpen(true); }}><IonIcon slot="start" icon={walletOutline} /><span className="action-label">Cuentas y saldos</span></IonButton>
               <IonButton fill="outline" className="quiet-button" onClick={() => setCategoryOpen('expense')}><IonIcon slot="start" icon={createOutline} /><span className="action-label">Rubros</span></IonButton>
-              <IonButton fill="outline" className="quiet-button" onClick={() => setTransfer({ date: localDate(new Date()), amount: '', account: 'bank', toAccount: 'cash', note: '' })}><IonIcon slot="start" icon={swapHorizontalOutline} /><span className="action-label">Transferir</span></IonButton>
+              <IonButton fill="outline" className="quiet-button" onClick={startTransfer} disabled={!bankAccounts.length}><IonIcon slot="start" icon={swapHorizontalOutline} /><span className="action-label">Transferir</span></IonButton>
+              <IonButton fill="outline" className="quiet-button" onClick={startWithdrawal} disabled={!bankAccounts.length}><IonIcon slot="start" icon={cashOutline} /><span className="action-label">Retirar</span></IonButton>
               <IonButton className="add-button" onClick={() => setDraft(makeDraft('expense'))}><IonIcon slot="start" icon={addOutline} /><span className="action-label">Registrar</span></IonButton>
+              <IonButton fill="outline" className="quiet-button" onClick={() => { setPasswordDraft({ current: '', next: '', confirm: '' }); setPasswordError(''); setPasswordOpen(true); }}><IonIcon slot="start" icon={lockClosedOutline} /><span className="action-label">Cambiar contraseña</span></IonButton>
               <IonButton fill="outline" className="quiet-button" onClick={onLogout}><IonIcon slot="start" icon={logOutOutline} /><span className="action-label">Cerrar sesión</span></IonButton>
             </div>
           </header>
@@ -189,7 +249,7 @@ export default function App({ onLogout }: { onLogout: () => void }) {
                 <button aria-label="Mes siguiente" onClick={() => moveMonth(1)}><IonIcon icon={chevronForwardOutline} /></button>
               </div>
               <div className="account-filter" role="group" aria-label="Filtrar por cuenta">
-                {([['all', 'Todo'], ['cash', 'Efectivo'], ['bank', 'Débito']] as const).map(([value, label]) => <button key={value} className={filter === value ? 'selected' : ''} onClick={() => setFilter(value)}>{label}</button>)}
+                {[{ id: 'all', name: 'Todo' }, ...data.accounts].map((account) => <button key={account.id} className={filter === account.id ? 'selected' : ''} onClick={() => setFilter(account.id)}>{account.name}</button>)}
               </div>
             </div>
           </section>
@@ -198,7 +258,7 @@ export default function App({ onLogout }: { onLogout: () => void }) {
             <article className="summary-item income-summary"><span>Ingresos del mes</span><strong>{money.format(incomeTotal)}</strong><small><IonIcon icon={arrowBackOutline} /> Entradas registradas</small></article>
             <article className="summary-item expense-summary"><span>Gastos del mes</span><strong>{money.format(expenseTotal)}</strong><small><IonIcon icon={arrowForwardOutline} /> Salidas registradas</small></article>
             <article className="summary-item net-summary"><span>Balance del mes</span><strong>{money.format(incomeTotal - expenseTotal)}</strong><small>Ingresos menos gastos</small></article>
-            <article className="accounts-summary"><span>Disponible al cierre</span><div>{accounts.map((account) => <p key={account.id}><span><i className={`account-dot ${account.id}`} />{account.id === 'bank' ? 'Banco / débito' : account.name}</span><strong>{money.format(balanceAt(account.id))}</strong></p>)}</div></article>
+            <article className="accounts-summary"><span>Disponible al cierre</span><div>{data.accounts.map((account) => <p key={account.id}><span><i className={`account-dot ${account.kind}`} />{account.name}</span><strong>{money.format(balanceAt(account.id))}</strong></p>)}<p className="debit-total"><span>Total Débito</span><strong>{money.format(bankAccounts.reduce((total, account) => total + balanceAt(account.id), 0))}</strong></p></div></article>
           </section>
 
           <section className="sheet-section">
@@ -234,7 +294,7 @@ export default function App({ onLogout }: { onLogout: () => void }) {
             <div className="kind-switch"><button className={draft.kind === 'income' ? 'active income-active' : ''} onClick={() => setDraft({ ...draft, kind: 'income', categoryId: activeCategories.find((category) => category.kind === 'income')?.id ?? '' })}>Ingreso</button><button className={draft.kind === 'expense' ? 'active expense-active' : ''} onClick={() => setDraft({ ...draft, kind: 'expense', categoryId: activeCategories.find((category) => category.kind === 'expense')?.id ?? '' })}>Gasto</button></div>
             <IonItem className="form-item"><IonInput label="Monto" labelPlacement="stacked" type="number" min="0.01" step="0.01" placeholder="0,00" value={draft.amount} onIonInput={(event) => setDraft({ ...draft, amount: String(event.detail.value ?? '') })} /></IonItem>
             <IonItem className="form-item"><IonSelect label="Rubro" labelPlacement="stacked" interface="popover" value={draft.categoryId} onIonChange={(event) => setDraft({ ...draft, categoryId: event.detail.value })}>{activeCategories.filter((category) => category.kind === draft.kind).map((category) => <IonSelectOption key={category.id} value={category.id}>{category.name}</IonSelectOption>)}</IonSelect></IonItem>
-            <IonItem className="form-item"><IonSelect label={draft.kind === 'income' ? 'Recibir en' : 'Pagar con'} labelPlacement="stacked" interface="popover" value={draft.account} onIonChange={(event) => setDraft({ ...draft, account: event.detail.value })}>{accounts.map((account) => <IonSelectOption key={account.id} value={account.id}>{account.id === 'bank' ? 'Débito · cuenta bancaria' : account.name}</IonSelectOption>)}</IonSelect></IonItem>
+            <IonItem className="form-item"><IonSelect label={draft.kind === 'income' ? 'Recibir en' : 'Pagar con'} labelPlacement="stacked" interface="popover" value={draft.account} onIonChange={(event) => setDraft({ ...draft, account: event.detail.value })}>{data.accounts.map((account) => <IonSelectOption key={account.id} value={account.id}>{account.name}</IonSelectOption>)}</IonSelect></IonItem>
             <IonItem className="form-item"><IonInput label="Fecha" labelPlacement="stacked" type="date" value={draft.date} onIonInput={(event) => setDraft({ ...draft, date: String(event.detail.value ?? '') })} /></IonItem>
             <IonItem className="form-item note-item"><IonTextarea label="Descripción (opcional)" labelPlacement="stacked" autoGrow rows={2} value={draft.note} onIonInput={(event) => setDraft({ ...draft, note: String(event.detail.value ?? '') })} /></IonItem>
             <div className="modal-actions">{draft.id && <IonButton fill="clear" color="danger" onClick={() => { removeMovement(draft.id!); setDraft(null); }}>Eliminar</IonButton>}<IonButton fill="outline" onClick={() => setDraft(null)}>Cancelar</IonButton><IonButton onClick={saveMovement}>Guardar</IonButton></div>
@@ -246,7 +306,7 @@ export default function App({ onLogout }: { onLogout: () => void }) {
         <div className="modal-shell cell-modal">
           <div className="modal-heading"><div><span className="modal-kicker">{cell?.category.kind === 'income' ? 'INGRESOS' : 'GASTOS'} · {cell?.date}</span><h2>{cell?.category.name}</h2></div><button className="icon-close" onClick={() => setCell(null)} aria-label="Cerrar"><IonIcon icon={closeOutline} /></button></div>
           {cell && <>
-            <div className="cell-movements">{categoryMovements.length ? categoryMovements.map((movement) => <article className="movement-line" key={movement.id}><div><strong>{money.format(movement.amount)}</strong><span>{accountName(movement.kind === 'income' ? movement.toAccount : movement.account)}{movement.note ? ` · ${movement.note}` : ''}</span></div><button aria-label="Editar movimiento" onClick={() => { setCell(null); setDraft({ id: movement.id, date: movement.date, kind: movement.kind as 'income' | 'expense', amount: String(movement.amount), categoryId: movement.categoryId ?? '', account: (movement.kind === 'income' ? movement.toAccount : movement.account) ?? 'cash', note: movement.note }); }}><IonIcon icon={createOutline} /></button><button aria-label="Eliminar movimiento" onClick={() => removeMovement(movement.id)}><IonIcon icon={closeOutline} /></button></article>) : <p className="empty-state">No hay movimientos para este rubro y día.</p>}</div>
+            <div className="cell-movements">{categoryMovements.length ? categoryMovements.map((movement) => <article className="movement-line" key={movement.id}><div><strong>{money.format(movement.amount)}</strong><span>{accountName(movement.kind === 'income' ? movement.toAccount : movement.account, data.accounts)}{movement.note ? ` · ${movement.note}` : ''}</span></div><button aria-label="Editar movimiento" onClick={() => { setCell(null); setDraft({ id: movement.id, date: movement.date, kind: movement.kind as 'income' | 'expense', amount: String(movement.amount), categoryId: movement.categoryId ?? '', account: (movement.kind === 'income' ? movement.toAccount : movement.account) ?? 'cash', note: movement.note }); }}><IonIcon icon={createOutline} /></button><button aria-label="Eliminar movimiento" onClick={() => removeMovement(movement.id)}><IonIcon icon={closeOutline} /></button></article>) : <p className="empty-state">No hay movimientos para este rubro y día.</p>}</div>
             <IonButton expand="block" onClick={() => { const next = makeDraft(cell.category.kind, cell.date, cell.category.id); setCell(null); setDraft(next); }}><IonIcon slot="start" icon={addOutline} /> Agregar movimiento</IonButton>
           </>}
         </div>
@@ -255,14 +315,14 @@ export default function App({ onLogout }: { onLogout: () => void }) {
       <CategoryManager open={categoryOpen !== null} initialKind={categoryOpen ?? 'expense'} categories={data.categories} onClose={() => setCategoryOpen(null)} onSave={saveCategories} />
 
       <IonModal isOpen={!!transfer} onDidDismiss={() => setTransfer(null)} className="form-modal">
-        <div className="modal-shell"><div className="modal-heading"><div><span className="modal-kicker">ENTRE TUS CUENTAS</span><h2>Transferir dinero</h2></div><button className="icon-close" onClick={() => setTransfer(null)} aria-label="Cerrar"><IonIcon icon={closeOutline} /></button></div>
+        <div className="modal-shell"><div className="modal-heading"><div><span className="modal-kicker">{transferMode === 'withdrawal' ? 'BANCO A EFECTIVO' : 'ENTRE TUS CUENTAS'}</span><h2>{transferMode === 'withdrawal' ? 'Retirar efectivo' : 'Transferir dinero'}</h2></div><button className="icon-close" onClick={() => setTransfer(null)} aria-label="Cerrar"><IonIcon icon={closeOutline} /></button></div>
           {transfer && <div className="form-fields"><p className="helper-copy">El traslado cambia los saldos, pero no cuenta como ingreso ni gasto.</p>
             <IonItem className="form-item"><IonInput label="Monto" labelPlacement="stacked" type="number" min="0.01" step="0.01" placeholder="0,00" value={transfer.amount} onIonInput={(event) => setTransfer({ ...transfer, amount: String(event.detail.value ?? '') })} /></IonItem>
-            <IonItem className="form-item"><IonSelect label="Desde" labelPlacement="stacked" value={transfer.account} onIonChange={(event) => setTransfer({ ...transfer, account: event.detail.value })}>{accounts.map((account) => <IonSelectOption key={account.id} value={account.id}>{account.name}</IonSelectOption>)}</IonSelect></IonItem>
-            <IonItem className="form-item"><IonSelect label="Hacia" labelPlacement="stacked" value={transfer.toAccount} onIonChange={(event) => setTransfer({ ...transfer, toAccount: event.detail.value })}>{accounts.map((account) => <IonSelectOption key={account.id} value={account.id}>{account.name}</IonSelectOption>)}</IonSelect></IonItem>
+            <IonItem className="form-item"><IonSelect label="Desde" labelPlacement="stacked" value={transfer.account} onIonChange={(event) => setTransfer({ ...transfer, account: event.detail.value })}>{(transferMode === 'withdrawal' ? bankAccounts : data.accounts).map((account) => <IonSelectOption key={account.id} value={account.id}>{account.name}</IonSelectOption>)}</IonSelect></IonItem>
+            {transferMode === 'withdrawal' ? <IonItem className="form-item"><IonInput label="Hacia" labelPlacement="stacked" readonly value="Efectivo" /></IonItem> : <IonItem className="form-item"><IonSelect label="Hacia" labelPlacement="stacked" value={transfer.toAccount} onIonChange={(event) => setTransfer({ ...transfer, toAccount: event.detail.value })}>{data.accounts.map((account) => <IonSelectOption key={account.id} value={account.id}>{account.name}</IonSelectOption>)}</IonSelect></IonItem>}
             <IonItem className="form-item"><IonInput label="Fecha" labelPlacement="stacked" type="date" value={transfer.date} onIonInput={(event) => setTransfer({ ...transfer, date: String(event.detail.value ?? '') })} /></IonItem>
             <IonItem className="form-item"><IonInput label="Descripción (opcional)" labelPlacement="stacked" value={transfer.note} onIonInput={(event) => setTransfer({ ...transfer, note: String(event.detail.value ?? '') })} /></IonItem>
-            <div className="modal-actions"><IonButton fill="outline" onClick={() => setTransfer(null)}>Cancelar</IonButton><IonButton onClick={saveTransfer} disabled={transfer.account === transfer.toAccount}>Guardar transferencia</IonButton></div>
+            <div className="modal-actions"><IonButton fill="outline" onClick={() => setTransfer(null)}>Cancelar</IonButton><IonButton onClick={saveTransfer} disabled={transfer.account === transfer.toAccount}>{transferMode === 'withdrawal' ? 'Guardar retiro' : 'Guardar transferencia'}</IonButton></div>
           </div>}
         </div>
       </IonModal>
@@ -270,7 +330,14 @@ export default function App({ onLogout }: { onLogout: () => void }) {
       <IonModal isOpen={balanceOpen} onDidDismiss={() => setBalanceOpen(false)} className="form-modal">
         <div className="modal-shell"><div className="modal-heading"><div><span className="modal-kicker">PUNTO DE PARTIDA</span><h2>Saldos iniciales</h2></div><button className="icon-close" onClick={() => setBalanceOpen(false)} aria-label="Cerrar"><IonIcon icon={closeOutline} /></button></div>
           <p className="helper-copy balance-copy">Registra cuánto tenías al comenzar a usar la app. Los movimientos actualizarán estos saldos.</p>
-          <div className="form-fields">{accounts.map((account) => <IonItem className="form-item" key={account.id}><IonInput label={account.id === 'bank' ? 'Banco / débito' : 'Efectivo'} labelPlacement="stacked" type="number" step="0.01" value={String(openingDraft[account.id] ?? 0)} onIonInput={(event) => setOpeningDraft((current) => ({ ...current, [account.id]: Number(event.detail.value ?? 0) }))} /></IonItem>)}<div className="modal-actions"><IonButton fill="outline" onClick={() => setBalanceOpen(false)}>Cancelar</IonButton><IonButton onClick={saveBalances}>Guardar saldos</IonButton></div></div>
+          <div className="form-fields">{data.accounts.map((account) => <div key={account.id}><IonItem className="form-item">{account.kind === 'bank' ? <IonInput label="Nombre o referencia de cuenta" labelPlacement="stacked" value={accountDrafts[account.id]?.name ?? account.name} onIonInput={(event) => setAccountDrafts((current) => ({ ...current, [account.id]: { name: String(event.detail.value ?? ''), balance: current[account.id]?.balance ?? String(account.openingBalance) } }))} /> : <IonInput label="Efectivo" labelPlacement="stacked" readonly value={account.name} />}</IonItem><IonItem className="form-item"><IonInput label={`Saldo inicial · desde ${account.startDate}`} labelPlacement="stacked" type="number" step="0.01" value={accountDrafts[account.id]?.balance ?? String(account.openingBalance)} onIonInput={(event) => setAccountDrafts((current) => ({ ...current, [account.id]: { name: current[account.id]?.name ?? account.name, balance: String(event.detail.value ?? '') } }))} /></IonItem></div>)}
+            <div className="new-account-fields"><IonItem className="form-item"><IonInput label="Nueva cuenta bancaria" labelPlacement="stacked" placeholder="Banco o número de cuenta" value={newAccountName} onIonInput={(event) => setNewAccountName(String(event.detail.value ?? ''))} /></IonItem><IonItem className="form-item"><IonInput label={`Saldo inicial · desde ${localDate(new Date())}`} labelPlacement="stacked" type="number" step="0.01" value={newAccountBalance} onIonInput={(event) => setNewAccountBalance(String(event.detail.value ?? ''))} /></IonItem></div>
+            <div className="modal-actions"><IonButton fill="outline" onClick={() => setBalanceOpen(false)}>Cancelar</IonButton><IonButton onClick={saveBalances}>Guardar cuentas</IonButton></div></div>
+        </div>
+      </IonModal>
+      <IonModal isOpen={passwordOpen} onDidDismiss={() => setPasswordOpen(false)} className="form-modal">
+        <div className="modal-shell"><div className="modal-heading"><div><span className="modal-kicker">SEGURIDAD</span><h2>Cambiar contraseña</h2></div><button className="icon-close" onClick={() => setPasswordOpen(false)} aria-label="Cerrar"><IonIcon icon={closeOutline} /></button></div>
+          <div className="form-fields"><IonItem className="form-item"><IonInput label="Contraseña actual" labelPlacement="stacked" type="password" autocomplete="current-password" value={passwordDraft.current} onIonInput={(event) => setPasswordDraft({ ...passwordDraft, current: String(event.detail.value ?? '') })} /></IonItem><IonItem className="form-item"><IonInput label="Nueva contraseña" labelPlacement="stacked" type="password" autocomplete="new-password" value={passwordDraft.next} onIonInput={(event) => setPasswordDraft({ ...passwordDraft, next: String(event.detail.value ?? '') })} /></IonItem><IonItem className="form-item"><IonInput label="Confirmar contraseña nueva" labelPlacement="stacked" type="password" autocomplete="new-password" value={passwordDraft.confirm} onIonInput={(event) => setPasswordDraft({ ...passwordDraft, confirm: String(event.detail.value ?? '') })} /></IonItem>{passwordError && <p className="form-error">{passwordError}</p>}<div className="modal-actions"><IonButton fill="outline" onClick={() => setPasswordOpen(false)} disabled={passwordSaving}>Cancelar</IonButton><IonButton onClick={() => void changePassword()} disabled={passwordSaving}>{passwordSaving ? 'Guardando…' : 'Cambiar contraseña'}</IonButton></div></div>
         </div>
       </IonModal>
       <IonToast isOpen={!!toast} message={toast} duration={2200} onDidDismiss={() => setToast('')} position="bottom" />

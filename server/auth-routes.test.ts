@@ -19,6 +19,8 @@ type SessionRecord = NewSession & { id: string };
 
 type MemoryAuthStore = {
   findOwner(username: string): Promise<{ username: string; passwordHash: string } | null>;
+  findOwnerCredentials(): Promise<{ username: string; passwordHash: string } | null>;
+  changePassword(currentHash: string, nextHash: string): Promise<boolean>;
   createSession(session: NewSession): Promise<void>;
   findActiveAccessToken(tokenHash: string, now: Date): Promise<{ id: string } | null>;
   rotateRefreshToken(currentHash: string, next: NewSession, now: Date): Promise<boolean>;
@@ -34,6 +36,7 @@ const protectedRoutes: Route[] = [
   { method: 'DELETE', path: '/api/movements/00000000-0000-0000-0000-000000000001' },
   { method: 'PUT', path: '/api/categories', body: [] },
   { method: 'PUT', path: '/api/accounts/cash', body: { openingBalance: 0 } },
+  { method: 'POST', path: '/api/accounts', body: { name: 'Banco prueba', openingBalance: 0 } },
 ];
 
 test('web and Android login return refresh tokens through their approved channels', async () => {
@@ -231,8 +234,119 @@ test('authenticated owner can read finance state and health remains public', asy
     assert.deepEqual(await state.json(), {
       categories: [],
       movements: [],
+      accounts: [
+        { id: 'cash', name: 'Efectivo', kind: 'cash', openingBalance: 0, startDate: '1900-01-01' },
+        { id: 'bank', name: 'Banco / débito', kind: 'bank', openingBalance: 0, startDate: '1900-01-01' },
+      ],
       opening: { cash: 0, bank: 0 },
     });
+  } finally {
+    await harness.close();
+  }
+});
+
+test('owner can create a bank account and use its id for debit movements', async () => {
+  const harness = await startHarness();
+  try {
+    const tokens = await loginAndroid(harness.baseUrl);
+    const headers = { authorization: `Bearer ${tokens.accessToken}` };
+    const accountResponse = await send(harness.baseUrl, '/api/accounts', {
+      method: 'POST',
+      headers,
+      body: { name: 'Banco de prueba', openingBalance: 35.5 },
+    });
+    assert.equal(accountResponse.status, 201);
+    const account = await accountResponse.json() as Record<string, unknown>;
+    assert.equal(account.name, 'Banco de prueba');
+    assert.equal(account.kind, 'bank');
+    assert.equal(account.openingBalance, 35.5);
+    assert.equal(account.startDate, new Date().toISOString().slice(0, 10));
+    assert.match(String(account.id), /^[0-9a-f-]{36}$/i);
+
+    const movement = await send(harness.baseUrl, '/api/movements', {
+      method: 'POST',
+      headers,
+      body: {
+        date: new Date().toISOString().slice(0, 10),
+        kind: 'expense',
+        amount: 5,
+        categoryId: '00000000-0000-0000-0000-000000000001',
+        account: account.id,
+        note: 'Compra',
+      },
+    });
+    assert.equal(movement.status, 201);
+    assert.equal((await movement.json() as Record<string, unknown>).account, account.id);
+  } finally {
+    await harness.close();
+  }
+});
+
+test('password change requires an authenticated session', async () => {
+  const harness = await startHarness();
+  try {
+    const response = await send(harness.baseUrl, '/api/auth/password', {
+      method: 'POST',
+      body: { currentPassword: 'correct password', newPassword: 'new password', confirmPassword: 'new password' },
+    });
+    assert.equal(response.status, 401);
+  } finally {
+    await harness.close();
+  }
+});
+
+test('password change rejects wrong current password and mismatched confirmation', async () => {
+  const harness = await startHarness();
+  try {
+    const tokens = await loginAndroid(harness.baseUrl);
+    const headers = { authorization: `Bearer ${tokens.accessToken}` };
+    const wrongCurrent = await send(harness.baseUrl, '/api/auth/password', {
+      method: 'POST', headers,
+      body: { currentPassword: 'wrong password', newPassword: 'new password', confirmPassword: 'new password' },
+    });
+    assert.equal(wrongCurrent.status, 400);
+    const mismatch = await send(harness.baseUrl, '/api/auth/password', {
+      method: 'POST', headers,
+      body: { currentPassword: 'correct password', newPassword: 'new password', confirmPassword: 'different password' },
+    });
+    assert.equal(mismatch.status, 400);
+    const oldPassword = await send(harness.baseUrl, '/api/auth/login', {
+      method: 'POST', body: { username: 'owner', password: 'correct password', client: 'android' },
+    });
+    assert.equal(oldPassword.status, 200);
+  } finally {
+    await harness.close();
+  }
+});
+
+test('password change saves new hash and revokes every session', async () => {
+  const harness = await startHarness();
+  try {
+    const firstSession = await loginAndroid(harness.baseUrl);
+    const secondSession = await loginAndroid(harness.baseUrl);
+    const changed = await send(harness.baseUrl, '/api/auth/password', {
+      method: 'POST',
+      headers: { authorization: `Bearer ${firstSession.accessToken}` },
+      body: { currentPassword: 'correct password', newPassword: 'new password', confirmPassword: 'new password' },
+    });
+    assert.equal(changed.status, 204);
+
+    const oldAccess = await send(harness.baseUrl, '/api/state', {
+      headers: { authorization: `Bearer ${secondSession.accessToken}` },
+    });
+    assert.equal(oldAccess.status, 401);
+    const oldRefresh = await send(harness.baseUrl, '/api/auth/refresh', {
+      method: 'POST', body: { client: 'android', refreshToken: secondSession.refreshToken },
+    });
+    assert.equal(oldRefresh.status, 401);
+    const oldPassword = await send(harness.baseUrl, '/api/auth/login', {
+      method: 'POST', body: { username: 'owner', password: 'correct password', client: 'android' },
+    });
+    assert.equal(oldPassword.status, 401);
+    const newPassword = await send(harness.baseUrl, '/api/auth/login', {
+      method: 'POST', body: { username: 'owner', password: 'new password', client: 'android' },
+    });
+    assert.equal(newPassword.status, 200);
   } finally {
     await harness.close();
   }
@@ -258,13 +372,48 @@ test('login is limited to ten attempts per IP in fifteen minutes', async () => {
 async function startHarness() {
   const store = await createMemoryAuthStore();
   const databaseCalls: string[] = [];
+  const accounts = [
+    { account_key: 'cash', name: 'Efectivo', account_type: 'cash', opening_balance: '0', start_date: '1900-01-01' },
+    { account_key: 'bank', name: 'Banco / débito', account_type: 'bank', opening_balance: '0', start_date: '1900-01-01' },
+  ];
   const pool = {
-    query: async (sql: string) => {
+    query: async (sql: string, values: unknown[] = []) => {
       databaseCalls.push(sql);
       if (sql.includes('FROM categories')) return { rows: [], rowCount: 0 };
       if (sql.includes('FROM movements')) return { rows: [], rowCount: 0 };
+      if (sql.includes('FROM accounts WHERE account_key')) {
+        const requested = values[0] as string[];
+        return { rows: accounts.filter((account) => requested.includes(account.account_key)), rowCount: requested.length };
+      }
       if (sql.includes('FROM accounts')) {
-        return { rows: [{ account_key: 'cash', opening_balance: '0' }, { account_key: 'bank', opening_balance: '0' }], rowCount: 2 };
+        return { rows: accounts, rowCount: accounts.length };
+      }
+      if (sql.includes('INSERT INTO accounts')) {
+        const [account_key, name, opening_balance, start_date] = values as [string, string, number, string | null];
+        const row = {
+          account_key,
+          name,
+          account_type: 'bank',
+          opening_balance: String(opening_balance),
+          start_date: start_date ?? new Date().toISOString().slice(0, 10),
+        };
+        accounts.push(row);
+        return { rows: [{ id: row.account_key, name: row.name, kind: row.account_type, openingBalance: row.opening_balance, startDate: row.start_date }], rowCount: 1 };
+      }
+      if (sql.includes('UPDATE accounts SET')) {
+        const [opening_balance, name, account_key] = values as [number, string | null, string];
+        const account = accounts.find((item) => item.account_key === account_key);
+        if (!account) return { rows: [], rowCount: 0 };
+        account.opening_balance = String(opening_balance);
+        if (account.account_type === 'bank' && name) account.name = name;
+        return { rows: [], rowCount: 1 };
+      }
+      if (sql.includes('INSERT INTO movements')) {
+        const [date, kind, amount, categoryId, account, toAccount, note] = values as [string, string, number, string | null, string | null, string | null, string];
+        return {
+          rows: [{ id: 'movement-id', date, kind, amount: String(amount), categoryId, account, toAccount, note }],
+          rowCount: 1,
+        };
       }
       return { rows: [{ '?column?': 1 }], rowCount: 1 };
     },
@@ -291,6 +440,15 @@ async function createMemoryAuthStore() {
   const authStore: MemoryAuthStore = {
     async findOwner(username) {
       return username === owner.username ? owner : null;
+    },
+    async findOwnerCredentials() {
+      return owner;
+    },
+    async changePassword(currentHash, nextHash) {
+      if (owner.passwordHash !== currentHash) return false;
+      owner.passwordHash = nextHash;
+      sessions.clear();
+      return true;
     },
     async createSession(session) {
       sessions.set(session.refreshTokenHash, { id: `session-${sessions.size + 1}`, ...session });

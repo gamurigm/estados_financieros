@@ -1,7 +1,8 @@
 import { createHash, randomBytes } from 'node:crypto';
 import { Router, type Response } from 'express';
 import { rateLimit } from 'express-rate-limit';
-import { verifyPassword } from './auth-crypto.js';
+import { hashPassword, verifyPassword } from './auth-crypto.js';
+import { requireAuth } from './auth-middleware.js';
 import type { AuthStore, NewSession } from './auth-store.js';
 
 const refreshCookieName = 'finance_refresh';
@@ -23,6 +24,13 @@ export function createAuthRouter(store: AuthStore) {
   const loginLimiter = rateLimit({
     windowMs: 15 * 60 * 1000,
     limit: 10,
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: { error: 'Demasiados intentos. Inténtalo de nuevo más tarde.' },
+  });
+  const passwordLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000,
+    limit: 5,
     standardHeaders: true,
     legacyHeaders: false,
     message: { error: 'Demasiados intentos. Inténtalo de nuevo más tarde.' },
@@ -76,6 +84,24 @@ export function createAuthRouter(store: AuthStore) {
       await store.revokeRefreshToken(hashToken(token), new Date());
     }
     clearRefreshCookie(response, client);
+    return response.status(204).end();
+  });
+
+  router.post('/password', passwordLimiter, requireAuth(store), async (request, response) => {
+    const { currentPassword, newPassword, confirmPassword } = request.body ?? {};
+    if (typeof currentPassword !== 'string' || typeof newPassword !== 'string' || typeof confirmPassword !== 'string' || !newPassword) {
+      return response.status(400).json({ error: 'Completa las tres contraseñas.' });
+    }
+    if (newPassword !== confirmPassword) return response.status(400).json({ error: 'La confirmación no coincide.' });
+
+    const owner = await store.findOwnerCredentials();
+    if (!owner || !await verifyPassword(currentPassword, owner.passwordHash)) {
+      return response.status(400).json({ error: 'La contraseña actual es incorrecta.' });
+    }
+    const changed = await store.changePassword(owner.passwordHash, await hashPassword(newPassword));
+    if (!changed) return response.status(409).json({ error: 'La contraseña cambió. Inicia sesión e inténtalo otra vez.' });
+
+    clearRefreshCookie(response, 'web');
     return response.status(204).end();
   });
 

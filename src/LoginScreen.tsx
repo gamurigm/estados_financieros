@@ -4,11 +4,12 @@ import { lockClosedOutline } from 'ionicons/icons';
 
 type LoginScreenProps = {
   error: string;
+  notice?: string;
   submitting: boolean;
   onSubmit(username: string, password: string): Promise<void>;
 };
 
-export default function LoginScreen({ error, submitting, onSubmit }: LoginScreenProps) {
+export default function LoginScreen({ error, notice, submitting, onSubmit }: LoginScreenProps) {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
 
@@ -56,6 +57,7 @@ export default function LoginScreen({ error, submitting, onSubmit }: LoginScreen
               </label>
 
               {error && <div className="login-error" role="alert">{error}</div>}
+              {notice && <div className="login-notice" role="status">{notice}</div>}
               <IonButton className="login-submit" type="submit" expand="block" disabled={submitting || !username.trim() || !password}>
                 {submitting ? <IonSpinner name="crescent" /> : <><IonIcon slot="start" icon={lockClosedOutline} />Ingresar</>}
               </IonButton>

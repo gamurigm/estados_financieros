@@ -9,6 +9,7 @@ type SessionState = 'checking' | 'anonymous' | 'authenticated';
 export default function AuthGate() {
   const [session, setSession] = useState<SessionState>('checking');
   const [error, setError] = useState('');
+  const [notice, setNotice] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const activeSession = useRef(false);
 
@@ -37,6 +38,7 @@ export default function AuthGate() {
   const login = async (username: string, password: string) => {
     setSubmitting(true);
     setError('');
+    setNotice('');
     try {
       await loginWeb(username, password);
       activeSession.current = true;
@@ -53,6 +55,7 @@ export default function AuthGate() {
     try {
       await logoutWeb();
       setError('');
+      setNotice('');
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'No se pudo cerrar sesión.');
     } finally {
@@ -67,8 +70,13 @@ export default function AuthGate() {
   }
 
   if (session === 'anonymous') {
-    return <LoginScreen error={error} submitting={submitting} onSubmit={login} />;
+    return <LoginScreen error={error} notice={notice} submitting={submitting} onSubmit={login} />;
   }
 
-  return <App onLogout={() => { void logout(); }} />;
+  return <App onLogout={() => { void logout(); }} onPasswordChanged={() => {
+    activeSession.current = false;
+    setError('');
+    setNotice('Contraseña actualizada. Ingresa con tu nueva contraseña.');
+    setSession('anonymous');
+  }} />;
 }

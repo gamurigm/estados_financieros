@@ -152,14 +152,20 @@ test('remote PostgreSQL commands expand credentials only inside the container', 
 test('cloud verification compares categories, opening balances, counts, and calculated balances', () => {
   const source = {
     categories: [{ id: 'a', name: 'Comida', kind: 'expense', active: true }],
-    accounts: [{ key: 'cash', openingBalance: '10.00' }, { key: 'bank', openingBalance: '0.00' }],
+    accounts: [
+      { key: 'cash', name: 'Efectivo', kind: 'cash', openingBalance: '10.00', startDate: '1900-01-01' },
+      { key: 'bank', name: 'Banco A', kind: 'bank', openingBalance: '0.00', startDate: '1900-01-01' },
+    ],
     movementCount: '2',
     latestDate: '2026-10-19',
     balanceThroughLatest: { cash: '5.00', bank: '7.25' },
   };
   const matching = {
     ...source,
-    accounts: [{ key: 'bank', openingBalance: 0 }, { key: 'cash', openingBalance: 10 }],
+    accounts: [
+      { key: 'bank', name: 'Banco A', kind: 'bank', openingBalance: 0, startDate: '1900-01-01' },
+      { key: 'cash', name: 'Efectivo', kind: 'cash', openingBalance: 10, startDate: '1900-01-01' },
+    ],
     movementCount: 2,
     balanceThroughLatest: { bank: 7.25, cash: 5 },
   };
@@ -168,12 +174,21 @@ test('cloud verification compares categories, opening balances, counts, and calc
   const mismatch = {
     ...matching,
     categories: [{ id: 'a', name: 'Comida y snacks', kind: 'expense', active: true }],
-    accounts: [{ key: 'bank', openingBalance: 0 }, { key: 'cash', openingBalance: 11 }],
+    accounts: [
+      { key: 'bank', name: 'Banco A', kind: 'bank', openingBalance: 0, startDate: '1900-01-01' },
+      { key: 'cash', name: 'Efectivo', kind: 'cash', openingBalance: 11, startDate: '1900-01-01' },
+    ],
     movementCount: 3,
     latestDate: '2026-10-20',
     balanceThroughLatest: { cash: 4, bank: 7.25 },
   };
   assert.deepEqual(compareFinanceSnapshots(source, mismatch).differences, ['rubros', 'saldos iniciales', 'cantidad de movimientos', 'última fecha', 'saldos calculados']);
+
+  const renamedBank = {
+    ...matching,
+    accounts: matching.accounts.map((account) => account.key === 'bank' ? { ...account, name: 'Banco B' } : account),
+  };
+  assert.deepEqual(compareFinanceSnapshots(source, renamedBank).differences, ['saldos iniciales']);
 });
 
 async function runRestore(overrides = {}) {
