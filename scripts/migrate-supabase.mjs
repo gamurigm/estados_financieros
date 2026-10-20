@@ -12,6 +12,7 @@ if (!['postgres:', 'postgresql:'].includes(remoteUrl.protocol) || !remoteUrl.hos
   throw new Error('Usa la URI PostgreSQL Session pooler copiada desde Supabase.');
 }
 remoteUrl.searchParams.set('sslmode', 'require');
+remoteUrl.searchParams.set('uselibpqcompat', 'true');
 
 const local = new Pool({ connectionString: env.DATABASE_URL, max: 1, connectionTimeoutMillis: 15_000 });
 const remote = new Pool({ connectionString: remoteUrl.toString(), max: 1, connectionTimeoutMillis: 15_000 });
