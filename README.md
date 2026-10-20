@@ -4,6 +4,18 @@
   <img src='mobile/assets/icon-finance.png' alt='Ícono de Estados financieros' width='180'>
 </p>
 
+<p align='center'>
+  <img alt='Ionic React 9' src='https://img.shields.io/badge/Ionic_React-9-3880FF?style=flat-square&logo=ionic&logoColor=white'>
+  <img alt='React Native 0.88' src='https://img.shields.io/badge/React_Native-0.88-20232A?style=flat-square&logo=react&logoColor=61DAFB'>
+  <img alt='Expo SDK 58' src='https://img.shields.io/badge/Expo-SDK_58-000020?style=flat-square&logo=expo&logoColor=white'>
+  <img alt='Express 5' src='https://img.shields.io/badge/Express-5-000000?style=flat-square&logo=express&logoColor=white'>
+  <img alt='Node.js 22' src='https://img.shields.io/badge/Node.js-22-339933?style=flat-square&logo=nodedotjs&logoColor=white'>
+  <img alt='PostgreSQL 17' src='https://img.shields.io/badge/PostgreSQL-17-4169E1?style=flat-square&logo=postgresql&logoColor=white'>
+  <img alt='Supabase' src='https://img.shields.io/badge/Supabase-Database-3FCF8E?style=flat-square&logo=supabase&logoColor=white'>
+  <img alt='Render' src='https://img.shields.io/badge/Render-API-46E3B7?style=flat-square&logo=render&logoColor=white'>
+  <img alt='Docker' src='https://img.shields.io/badge/Docker-2496ED?style=flat-square&logo=docker&logoColor=white'>
+</p>
+
 Registro financiero mensual para web y Android. La web usa Ionic React; Android, React Native. La API usa Express y PostgreSQL, local con Docker o remoto. GitHub guarda el código y puede guardar respaldos cifrados de la base.
 
 ## Inicio local
