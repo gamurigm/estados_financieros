@@ -1,61 +1,74 @@
 # Estados financieros
 
-<p align="center">
-  <img src="mobile/assets/icon-finance.png" alt="Icono de Estados financieros" width="160" />
+<p align='center'>
+  <img src='mobile/assets/icon-finance.png' alt='Ícono de Estados financieros' width='180'>
 </p>
 
-Libro financiero personal para web y Android. La app móvil está hecha con React Native; ambas versiones usan una API y una base de datos PostgreSQL.
+Registro financiero mensual para web y Android. La web usa Ionic React; Android, React Native. La API usa Express y PostgreSQL, local con Docker o remoto. GitHub guarda el código y puede guardar respaldos cifrados de la base.
 
-## Desarrollo en Android Emulator
+## Inicio local
 
-Requisitos: Node.js, Docker Desktop y Android Studio con un emulador configurado.
+Requisitos: Node.js y Docker Desktop.
+
+1. Instala dependencias: `npm install`.
+2. Prepara PostgreSQL: `npm run db:up`.
+3. Aplica migraciones: `npm run db:migrate`.
+4. Crea el acceso inicial: `npm run owner:create`. Escribe usuario y contraseña en la terminal.
+5. Inicia la API y la web: `npm run local`.
+
+Abre `http://127.0.0.1:5173`. El primer inicio crea `.env` con una contraseña local aleatoria. Los siguientes inicios aplican las migraciones automáticamente.
+
+## Respaldos y cambio de equipo
+
+`npm run backup` cifra la base con AES-256-GCM y sube `backup/database.dump.enc` al repositorio privado de GitHub. Usa una frase de al menos 12 caracteres y guárdala fuera de GitHub. Nunca subas un `.dump` sin cifrar.
+
+En el equipo nuevo, clona el repositorio, ejecuta `npm install` y `npm run restore`; confirma con `REEMPLAZAR`. Usa la misma frase secreta. Antes de restaurar en un equipo existente, ejecuta `git pull`. Trabaja en un solo equipo a la vez y respalda antes de cambiar.
+
+## Android
+
+### Emulador local
+
+1. Instala dependencias desde la raíz: `npm install` y `npm --prefix mobile install`.
+2. En `mobile/.env`, configura `EXPO_PUBLIC_API_BASE_URL=http://10.0.2.2:3001`.
+3. Inicia la API: `npm run local`.
+4. En otra terminal, ejecuta `npm --prefix mobile run android`.
+
+La dirección `10.0.2.2` solo funciona desde el emulador Android.
+
+### APK privado
+
+Configura `mobile/.env` con la URL HTTPS pública de la API. En Windows, instala CMake 3.31.6 en el SDK de Android y ejecuta:
 
 ```powershell
-npm install
-npm --prefix mobile install
-npm run local
+npm run android:release
 ```
 
-`npm run local` prepara PostgreSQL, aplica migraciones y levanta la API y la web en `http://127.0.0.1:5173`. La primera vez, crea el propietario desde otra terminal:
+El APK queda en `mobile/android/app/build/outputs/apk/release/app-release.apk`. Usa el keystore local de depuración; sirve para uso personal, no para Google Play. Conserva el keystore para futuras actualizaciones.
 
-```powershell
-npm run owner:create
-```
+La URL de la API queda dentro del APK; vuelve a compilarlo si cambia.
 
-En `mobile/.env`, configura la API local del emulador y luego inicia Android:
+## API remota
 
-```dotenv
-EXPO_PUBLIC_API_BASE_URL=http://10.0.2.2:3001
-```
+- **Render y Supabase:** configura `DATABASE_URL` en Render con la URI Session pooler de Supabase. Pon la URL pública de la API en `mobile/.env`; nunca pongas credenciales de base de datos en la app.
+- **Tailscale:** para usar la API de esta PC, inicia `npm run local` y ejecuta `tailscale serve --bg 3001` en PowerShell como administrador. Usa la URL HTTPS de Tailscale en `mobile/.env`. El acceso queda limitado al tailnet; la PC debe seguir encendida. No uses Funnel.
+- **VPS:** requiere Docker, dominio apuntado al servidor y puertos 80/443 abiertos. Mantén cerrados los puertos de PostgreSQL y la API.
 
-```powershell
-npm --prefix mobile run android
-```
+### Desplegar en VPS
 
-## Android con Render y Supabase
+1. Copia `.env.production.example` a `.env.production` y configura `APP_DOMAIN`, `POSTGRES_DB`, `POSTGRES_USER` y una contraseña hexadecimal larga.
+2. Valida: `docker compose --env-file .env.production -f compose.prod.yml config`.
+3. Despliega: `docker compose --env-file .env.production -f compose.prod.yml up -d --build`.
+4. Crea el propietario por SSH: `docker compose --env-file .env.production -f compose.prod.yml exec api npm run owner:create`.
 
-Render ejecuta la API y guarda los datos en Supabase. La app requiere internet; cada cambio se sincroniza al guardarlo.
+Caddy configura HTTPS automáticamente cuando el dominio apunta al VPS y los puertos están disponibles.
 
-1. En Render, configura `DATABASE_URL` con la URI Session pooler de Supabase. Déjala como variable privada del servicio; nunca la pongas en la app.
-2. Copia `mobile/.env.example` a `mobile/.env`. Configura `EXPO_PUBLIC_API_BASE_URL` con la URL HTTPS de tu API.
-3. En Windows, instala CMake 3.31.6 en Android SDK Tools. Desde la raíz del proyecto, crea la APK:
+### Respaldos y migración de VPS
 
-   ```powershell
-   npm run android:release
-   ```
+Configura `CLOUD_SSH_TARGET` y `CLOUD_REMOTE_DIR` en `.env.production`. Se requieren OpenSSH, GitHub CLI y un repositorio `origin` privado.
 
-4. Instala `mobile/android/app/build/outputs/apk/release/app-release.apk` en el teléfono e inicia sesión.
+- `npm run backup:cloud`: cifra y publica el respaldo de producción. Usa la misma frase secreta que en `npm run backup`.
+- `npm run restore:cloud`: restaura en producción tras confirmar `REEMPLAZAR PRODUCCION`.
+- `npm run migrate:cloud`: envía la base local cifrada y pide `MIGRAR PRODUCCION` antes de reemplazar la base de producción. Conserva el propietario y las sesiones.
+- `npm run verify:cloud`: compara rubros, saldos iniciales, movimientos y saldos calculados hasta la última fecha de origen. Si falla, no cambies clientes.
 
-La URL de la API queda dentro de la APK. Si cambia, actualiza `mobile/.env` y vuelve a compilar. La APK de uso personal se firma con la clave de depuración local y no sirve para publicar en Google Play.
-
-## Comandos útiles
-
-| Comando | Uso |
-| --- | --- |
-| `npm run local` | Inicia PostgreSQL, la API y la web para desarrollo. |
-| `npm run build` | Compila la versión web. |
-| `npm run android:release` | Genera la APK Android. |
-| `npm run backup` | Cifra y sube a GitHub un respaldo de la base local. |
-| `npm run restore` | Restaura un respaldo cifrado en la base local. |
-
-Guarda la frase de cifrado del respaldo fuera de GitHub. Sin ella no se puede restaurar.
+Estos comandos son manuales. `restore:cloud` reemplaza los datos de producción.
