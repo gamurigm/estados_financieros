@@ -1,11 +1,16 @@
 import { useEffect, useRef } from 'react';
 
-export type FinanceSection = 'ledger' | 'budget' | 'analysis';
+export type FinanceSection = 'ledger' | 'budget' | 'analysis' | 'balance-sheet' | 'cash-flow';
 
 const sections: { id: FinanceSection; label: string; symbol: string }[] = [
   { id: 'ledger', label: 'Libro', symbol: '▤' },
   { id: 'budget', label: 'Presupuesto', symbol: '◷' },
   { id: 'analysis', label: 'Análisis', symbol: '▥' },
+];
+
+const reports: { id: FinanceSection; label: string; symbol: string }[] = [
+  { id: 'balance-sheet', label: 'Balance general', symbol: '◈' },
+  { id: 'cash-flow', label: 'Flujo de caja', symbol: '↗' },
 ];
 
 export function FinanceSidebar({ selected, open, onSelect, onClose }: {
@@ -43,8 +48,9 @@ export function FinanceSidebar({ selected, open, onSelect, onClose }: {
           <span className="sidebar-symbol" aria-hidden="true">{section.symbol}</span><span>{section.label}</span>
         </button>)}
         <div className="sidebar-divider" />
-        <button className="sidebar-link future-link" disabled><span className="sidebar-symbol" aria-hidden="true">◌</span><span>Balance general<small>Próximamente</small></span></button>
-        <button className="sidebar-link future-link" disabled><span className="sidebar-symbol" aria-hidden="true">◌</span><span>Flujo de caja<small>Próximamente</small></span></button>
+        {reports.map((section) => <button key={section.id} className={`sidebar-link ${selected === section.id ? 'selected' : ''}`} aria-current={selected === section.id ? 'page' : undefined} onClick={() => select(section.id)}>
+          <span className="sidebar-symbol" aria-hidden="true">{section.symbol}</span><span>{section.label}</span>
+        </button>)}
       </nav>
       <button className="sidebar-close" onClick={close} aria-label="Cerrar menú">×</button>
     </aside>

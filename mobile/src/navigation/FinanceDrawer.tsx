@@ -10,6 +10,8 @@ const destinations: { href: string; label: string; symbol: string }[] = [
   { href: '/(tabs)', label: 'Libro', symbol: '▤' },
   { href: '/budget', label: 'Presupuesto', symbol: '◷' },
   { href: '/analysis', label: 'Análisis', symbol: '▥' },
+  { href: '/balance-general', label: 'Balance general', symbol: '◈' },
+  { href: '/cash-flow', label: 'Flujo de caja', symbol: '↗' },
 ];
 
 export function FinanceDrawerProvider({ children }: PropsWithChildren) {
@@ -58,7 +60,7 @@ export function FinanceDrawerProvider({ children }: PropsWithChildren) {
                 </Pressable>
               </View>
               <View style={styles.links}>
-                {destinations.map((destination) => {
+                {destinations.slice(0, 3).map((destination) => {
                   const selected = pathname === destination.href || (destination.href === '/(tabs)' && pathname === '/');
                   return (
                     <Pressable
@@ -74,8 +76,21 @@ export function FinanceDrawerProvider({ children }: PropsWithChildren) {
                   );
                 })}
                 <View style={[styles.divider, { backgroundColor: colors.border }]} />
-                <FutureLink label="Balance general" colors={colors} />
-                <FutureLink label="Flujo de caja" colors={colors} />
+                {destinations.slice(3).map((destination) => {
+                  const selected = pathname === destination.href;
+                  return (
+                    <Pressable
+                      accessibilityRole="button"
+                      accessibilityState={{ selected }}
+                      key={destination.href}
+                      onPress={() => select(destination.href)}
+                      style={({ pressed }) => [styles.link, { backgroundColor: selected ? colors.tint : 'transparent', borderColor: selected ? colors.primary : 'transparent' }, pressed && styles.pressed]}
+                    >
+                      <Text style={[styles.symbol, { color: selected ? colors.primary : colors.muted }]}>{destination.symbol}</Text>
+                      <Text style={[styles.linkLabel, { color: selected ? colors.primary : colors.ink }]}>{destination.label}</Text>
+                    </Pressable>
+                  );
+                })}
               </View>
               <Text style={[styles.footer, { color: colors.muted }]}>Tus finanzas, a la vista</Text>
             </SafeAreaView>
@@ -97,18 +112,6 @@ export function DrawerMenuButton() {
   );
 }
 
-function FutureLink({ label, colors }: { label: string; colors: ReturnType<typeof useTheme>['colors'] }) {
-  return (
-    <Pressable accessibilityLabel={`${label}, próximamente`} accessibilityRole="button" accessibilityState={{ disabled: true }} disabled style={[styles.link, styles.futureLink]}>
-      <Text style={[styles.symbol, { color: colors.muted }]}>◌</Text>
-      <View style={styles.futureCopy}>
-        <Text style={[styles.linkLabel, { color: colors.muted }]}>{label}</Text>
-        <Text style={[styles.comingSoon, { color: colors.muted }]}>Próximamente</Text>
-      </View>
-    </Pressable>
-  );
-}
-
 const styles = StyleSheet.create({
   overlay: { backgroundColor: 'rgba(3, 8, 20, 0.62)', flex: 1, flexDirection: 'row' },
   panel: { borderRightWidth: 1, elevation: 18, height: '100%', shadowColor: '#000000', shadowOffset: { width: 8, height: 0 }, shadowOpacity: 0.24, shadowRadius: 24 },
@@ -123,9 +126,6 @@ const styles = StyleSheet.create({
   symbol: { fontSize: 22, textAlign: 'center', width: 24 },
   linkLabel: { fontSize: 15, fontWeight: '700' },
   divider: { height: 1, marginHorizontal: 7, marginVertical: 8 },
-  futureLink: { opacity: 0.68 },
-  futureCopy: { gap: 2 },
-  comingSoon: { fontSize: 11 },
   footer: { fontSize: 12, marginTop: 'auto', paddingBottom: 14, paddingTop: 24 },
   menuButton: { alignItems: 'center', borderRadius: 14, borderWidth: 1, height: 48, justifyContent: 'center', width: 48 },
   menuSymbol: { fontSize: 21, fontWeight: '700' },

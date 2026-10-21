@@ -1,15 +1,19 @@
 import { useState, type FormEvent } from 'react';
 import { IonApp, IonButton, IonContent, IonIcon, IonInput, IonItem, IonSpinner } from '@ionic/react';
 import { lockClosedOutline } from 'ionicons/icons';
+import { ThemeToggle } from './ThemeToggle';
+import type { WebThemeMode } from './theme/web-theme';
 
 type LoginScreenProps = {
   error: string;
   notice?: string;
   submitting: boolean;
+  themeMode: WebThemeMode;
+  onThemeToggle(): void;
   onSubmit(username: string, password: string): Promise<void>;
 };
 
-export default function LoginScreen({ error, notice, submitting, onSubmit }: LoginScreenProps) {
+export default function LoginScreen({ error, notice, submitting, themeMode, onThemeToggle, onSubmit }: LoginScreenProps) {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
 
@@ -24,7 +28,7 @@ export default function LoginScreen({ error, notice, submitting, onSubmit }: Log
       <IonContent fullscreen className="auth-content">
         <main className="login-layout">
           <section className="login-card" aria-labelledby="login-title">
-            <div className="login-brand"><span className="brand-mark">ef</span><span>ESTADOS FINANCIEROS</span></div>
+            <div className="login-brand"><span className="brand-mark">ef</span><span>ESTADOS FINANCIEROS</span><ThemeToggle mode={themeMode} onToggle={onThemeToggle} className="login-theme-toggle" /></div>
             <p className="eyebrow login-kicker">TU ESPACIO PERSONAL</p>
             <h1 id="login-title">Ingresa a tu cuenta</h1>
             <p className="login-description">Accede a tus ingresos y gastos desde cualquier lugar.</p>

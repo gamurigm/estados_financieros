@@ -31,8 +31,12 @@ import { changeWebPassword } from './auth';
 import { createBankAccount, deleteMovement as deleteMovementRequest, loadFinanceState, saveAccount, saveCategories as saveCategoriesRequest, saveMovement as saveMovementRequest, saveOpeningBalance } from './api';
 import type { Account, AccountId, Category, FinanceState as Data } from './api';
 import { AnalysisPage } from './features/analysis/AnalysisPage';
+import { BalanceSheetPage } from './features/analysis/BalanceSheetPage';
 import { BudgetPage } from './features/budget/BudgetPage';
+import { CashFlowPage } from './features/analysis/CashFlowPage';
 import { FinanceSidebar, type FinanceSection } from './features/navigation/FinanceSidebar';
+import { ThemeToggle } from './ThemeToggle';
+import type { WebThemeMode } from './theme/web-theme';
 
 const money = new Intl.NumberFormat('es-EC', { style: 'currency', currency: 'USD', minimumFractionDigits: 2 });
 const localDate = (date: Date) => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
@@ -45,11 +49,14 @@ type MovementDraft = { id?: string; date: string; kind: 'income' | 'expense'; am
 type TransferDraft = { date: string; amount: string; account: AccountId; toAccount: AccountId; note: string };
 type CellSelection = { date: string; category: Category };
 
-export default function App({ onLogout, onPasswordChanged }: { onLogout: () => void; onPasswordChanged: () => void }) {
+export default function App({ themeMode, onThemeToggle, onLogout, onPasswordChanged }: { themeMode: WebThemeMode; onThemeToggle: () => void; onLogout: () => void; onPasswordChanged: () => void }) {
   const [data, setData] = useState<Data>({ categories: [], movements: [], accounts: [], opening: { cash: 0, bank: 0 } });
   const [loading, setLoading] = useState(true);
   const [apiError, setApiError] = useState('');
   const [month, setMonth] = useState(localDate(new Date()).slice(0, 7));
+  const [balanceAsOfDate, setBalanceAsOfDate] = useState(() => localDate(new Date()));
+  const [cashFlowEndDate, setCashFlowEndDate] = useState(() => localDate(new Date()));
+  const [cashFlowStartDate, setCashFlowStartDate] = useState(() => `${localDate(new Date()).slice(0, 7)}-01`);
   const [section, setSection] = useState<FinanceSection>('ledger');
   const [navigationOpen, setNavigationOpen] = useState(false);
   const [filter, setFilter] = useState<'all' | AccountId>('all');
@@ -228,6 +235,7 @@ export default function App({ onLogout, onPasswordChanged }: { onLogout: () => v
             <a className="brand-mark" href="#inicio" aria-label="Estados financieros"><span>ef</span></a>
             <div className="brand-copy"><strong>Estados financieros</strong><span>Tu mes, claro y en orden</span></div>
             <div className="top-actions">
+              <ThemeToggle mode={themeMode} onToggle={onThemeToggle} />
               <IonButton fill="outline" className="quiet-button" onClick={() => { setAccountDrafts(Object.fromEntries(data.accounts.map((account) => [account.id, { name: account.name, balance: String(account.openingBalance) }]))); setBalanceOpen(true); }}><IonIcon slot="start" icon={walletOutline} /><span className="action-label">Cuentas y saldos</span></IonButton>
               <IonButton fill="outline" className="quiet-button" onClick={() => setCategoryOpen('expense')}><IonIcon slot="start" icon={createOutline} /><span className="action-label">Rubros</span></IonButton>
               <IonButton fill="outline" className="quiet-button" onClick={startTransfer} disabled={!bankAccounts.length}><IonIcon slot="start" icon={swapHorizontalOutline} /><span className="action-label">Transferir</span></IonButton>
@@ -294,7 +302,10 @@ export default function App({ onLogout, onPasswordChanged }: { onLogout: () => v
             </div>
             <footer className="sheet-footer"><span>Datos guardados en tu cuenta.</span><span><i className="account-dot cash" /> Efectivo <i className="account-dot bank" /> Débito</span></footer>
           </section>
-          </> : section === 'budget' ? <BudgetPage data={data} month={month} onMonthChange={setMonth} /> : <AnalysisPage data={data} month={month} onMonthChange={setMonth} />}
+          </> : section === 'budget' ? <BudgetPage data={data} month={month} onMonthChange={setMonth} />
+            : section === 'analysis' ? <AnalysisPage data={data} month={month} onMonthChange={setMonth} />
+              : section === 'balance-sheet' ? <BalanceSheetPage data={data} asOfDate={balanceAsOfDate} onAsOfDateChange={setBalanceAsOfDate} />
+                : <CashFlowPage data={data} startDate={cashFlowStartDate} endDate={cashFlowEndDate} onStartDateChange={setCashFlowStartDate} onEndDateChange={setCashFlowEndDate} />}
             </div>
           </div>
         </main>

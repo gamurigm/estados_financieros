@@ -11,13 +11,12 @@
 
 :root {
   --ion-font-family: 'Aptos', 'Segoe UI', sans-serif;
-  --ion-color-primary: #1768a6;
-  --ion-color-primary-rgb: 23, 104, 166;
-  --ion-color-primary-contrast: #ffffff;
-  --ion-color-primary-shade: #145b92;
-  --ion-color-primary-tint: #2e77af;
-  --ion-color-success: #17866b;
-  --ion-color-danger: #c45437;
-  --ion-background-color: #f3f6f8;
-  --ion-text-color: #1b2935;
+  --ion-color-primary: var(--primary);
+  --ion-color-primary-contrast: var(--on-primary);
+  --ion-color-primary-shade: var(--primary-pressed);
+  --ion-color-primary-tint: var(--accent);
+  --ion-color-success: var(--mint);
+  --ion-color-danger: var(--orange);
+  --ion-background-color: transparent;
+  --ion-text-color: var(--ink);
 }

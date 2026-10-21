@@ -3,6 +3,7 @@ import { IonApp, IonContent, IonSpinner } from '@ionic/react';
 import App from './App';
 import { loginWeb, logoutWeb, refreshWebSession, subscribeToSessionExpiry } from './auth';
 import LoginScreen from './LoginScreen';
+import { themeFromStorage, webThemeStorageKey, type WebThemeMode } from './theme/web-theme';
 
 type SessionState = 'checking' | 'anonymous' | 'authenticated';
 
@@ -11,7 +12,15 @@ export default function AuthGate() {
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [themeMode, setThemeMode] = useState<WebThemeMode>(() => themeFromStorage(localStorage.getItem(webThemeStorageKey)));
   const activeSession = useRef(false);
+
+  useEffect(() => {
+    document.documentElement.dataset.theme = themeMode;
+    localStorage.setItem(webThemeStorageKey, themeMode);
+  }, [themeMode]);
+
+  const toggleTheme = () => setThemeMode((current) => current === 'dark' ? 'light' : 'dark');
 
   useEffect(() => {
     let mounted = true;
@@ -70,10 +79,10 @@ export default function AuthGate() {
   }
 
   if (session === 'anonymous') {
-    return <LoginScreen error={error} notice={notice} submitting={submitting} onSubmit={login} />;
+    return <LoginScreen error={error} notice={notice} submitting={submitting} themeMode={themeMode} onThemeToggle={toggleTheme} onSubmit={login} />;
   }
 
-  return <App onLogout={() => { void logout(); }} onPasswordChanged={() => {
+  return <App themeMode={themeMode} onThemeToggle={toggleTheme} onLogout={() => { void logout(); }} onPasswordChanged={() => {
     activeSession.current = false;
     setError('');
     setNotice('Contraseña actualizada. Ingresa con tu nueva contraseña.');
