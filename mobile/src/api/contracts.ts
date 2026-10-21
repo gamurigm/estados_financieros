@@ -12,6 +12,7 @@ export type Movement = {
   toAccount?: AccountId;
   note: string;
 };
+export type MonthlyBudget = { month: string; amount: number };
 export type FinanceState = {
   categories: Category[];
   movements: Movement[];

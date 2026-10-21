@@ -30,6 +30,9 @@ import {
 import { changeWebPassword } from './auth';
 import { createBankAccount, deleteMovement as deleteMovementRequest, loadFinanceState, saveAccount, saveCategories as saveCategoriesRequest, saveMovement as saveMovementRequest, saveOpeningBalance } from './api';
 import type { Account, AccountId, Category, FinanceState as Data } from './api';
+import { AnalysisPage } from './features/analysis/AnalysisPage';
+import { BudgetPage } from './features/budget/BudgetPage';
+import { FinanceSidebar, type FinanceSection } from './features/navigation/FinanceSidebar';
 
 const money = new Intl.NumberFormat('es-EC', { style: 'currency', currency: 'USD', minimumFractionDigits: 2 });
 const localDate = (date: Date) => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
@@ -47,6 +50,8 @@ export default function App({ onLogout, onPasswordChanged }: { onLogout: () => v
   const [loading, setLoading] = useState(true);
   const [apiError, setApiError] = useState('');
   const [month, setMonth] = useState(localDate(new Date()).slice(0, 7));
+  const [section, setSection] = useState<FinanceSection>('ledger');
+  const [navigationOpen, setNavigationOpen] = useState(false);
   const [filter, setFilter] = useState<'all' | AccountId>('all');
   const [draft, setDraft] = useState<MovementDraft | null>(null);
   const [transfer, setTransfer] = useState<TransferDraft | null>(null);
@@ -219,6 +224,7 @@ export default function App({ onLogout, onPasswordChanged }: { onLogout: () => v
       <IonContent fullscreen>
         <main className="workspace">
           <header className="topbar">
+            <button type="button" className="navigation-toggle" aria-label="Abrir menú de navegación" aria-expanded={navigationOpen} onClick={() => setNavigationOpen(true)}><span aria-hidden="true">☰</span></button>
             <a className="brand-mark" href="#inicio" aria-label="Estados financieros"><span>ef</span></a>
             <div className="brand-copy"><strong>Estados financieros</strong><span>Tu mes, claro y en orden</span></div>
             <div className="top-actions">
@@ -232,9 +238,13 @@ export default function App({ onLogout, onPasswordChanged }: { onLogout: () => v
             </div>
           </header>
 
+          <div className="finance-layout">
+            <FinanceSidebar selected={section} open={navigationOpen} onSelect={(next) => { setSection(next); setNavigationOpen(false); }} onClose={() => setNavigationOpen(false)} />
+            <div className="main-content">
           {loading && <div className="connection-banner"><IonSpinner name="crescent" /> Cargando tus datos…</div>}
           {apiError && <div className="connection-banner connection-error"><span>{apiError} Comprueba tu conexión e inténtalo de nuevo.</span><IonButton size="small" fill="outline" onClick={() => { setLoading(true); void refreshData().catch((error: unknown) => setApiError(error instanceof Error ? error.message : 'No se pudo conectar al servidor.')).finally(() => setLoading(false)); }}>Reintentar</IonButton></div>}
 
+          {section === 'ledger' ? <>
           <section className="month-heading" id="inicio">
             <div>
               <p className="eyebrow">CONTROL PERSONAL</p>
@@ -284,6 +294,9 @@ export default function App({ onLogout, onPasswordChanged }: { onLogout: () => v
             </div>
             <footer className="sheet-footer"><span>Datos guardados en tu cuenta.</span><span><i className="account-dot cash" /> Efectivo <i className="account-dot bank" /> Débito</span></footer>
           </section>
+          </> : section === 'budget' ? <BudgetPage data={data} month={month} onMonthChange={setMonth} /> : <AnalysisPage data={data} month={month} onMonthChange={setMonth} />}
+            </div>
+          </div>
         </main>
       </IonContent>
 

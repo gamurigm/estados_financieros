@@ -49,6 +49,44 @@ export function createApp(pool: Pool, authStore: AuthStore) {
     } catch (error) { next(error); }
   });
 
+  app.get('/api/budgets/:month', async (request, response, next) => {
+    try {
+      const monthStart = normalizeBudgetMonth(request.params.month);
+      if (!monthStart) return response.status(400).json({ error: 'El mes debe tener formato AAAA-MM.' });
+      const { rows } = await pool.query(
+        `SELECT to_char(month_start, 'YYYY-MM') AS month, amount
+         FROM monthly_budgets WHERE month_start=$1::date`,
+        [monthStart],
+      );
+      response.json(rows[0] ? { month: rows[0].month, amount: Number(rows[0].amount) } : null);
+    } catch (error) { next(error); }
+  });
+
+  app.put('/api/budgets/:month', async (request, response, next) => {
+    try {
+      const monthStart = normalizeBudgetMonth(request.params.month);
+      if (!monthStart) return response.status(400).json({ error: 'El mes debe tener formato AAAA-MM.' });
+      const amount = normalizeBudgetAmount(request.body?.amount);
+      if (amount === null) return response.status(400).json({ error: 'El presupuesto debe ser mayor que cero y tener hasta dos decimales.' });
+      const { rows } = await pool.query(
+        `INSERT INTO monthly_budgets (month_start, amount) VALUES ($1::date, $2)
+         ON CONFLICT (month_start) DO UPDATE SET amount=EXCLUDED.amount, updated_at=now()
+         RETURNING to_char(month_start, 'YYYY-MM') AS month, amount`,
+        [monthStart, amount],
+      );
+      response.json({ month: rows[0].month, amount: Number(rows[0].amount) });
+    } catch (error) { next(error); }
+  });
+
+  app.delete('/api/budgets/:month', async (request, response, next) => {
+    try {
+      const monthStart = normalizeBudgetMonth(request.params.month);
+      if (!monthStart) return response.status(400).json({ error: 'El mes debe tener formato AAAA-MM.' });
+      await pool.query('DELETE FROM monthly_budgets WHERE month_start=$1::date', [monthStart]);
+      response.status(204).end();
+    } catch (error) { next(error); }
+  });
+
   app.post('/api/movements', async (request, response, next) => {
     try {
       const row = normalizeMovement(request.body);
@@ -190,4 +228,17 @@ function isDateString(value: string) {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
   const parsed = new Date(`${value}T00:00:00Z`);
   return Number.isFinite(parsed.getTime()) && parsed.toISOString().slice(0, 10) === value;
+}
+
+function normalizeBudgetMonth(value: unknown) {
+  const month = typeof value === 'string' ? value : '';
+  return /^([1-9]\d{3})-(0[1-9]|1[0-2])$/.test(month) ? `${month}-01` : null;
+}
+
+function normalizeBudgetAmount(value: unknown) {
+  if (typeof value !== 'number' || !Number.isFinite(value) || value <= 0 || value > 999_999_999_999.99
+    || !/^\d{1,12}(?:\.\d{1,2})?$/.test(String(value))) {
+    return null;
+  }
+  return value;
 }

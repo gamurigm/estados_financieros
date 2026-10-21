@@ -6,6 +6,7 @@ import {
 import { BlurTargetView, BlurView } from 'expo-blur';
 import { palettes, type ThemeColors } from './theme/palette';
 import { useTheme } from './theme/ThemeProvider';
+import { DrawerMenuButton } from './navigation/FinanceDrawer';
 
 function createUi(colors: ThemeColors) {
   return StyleSheet.create({
@@ -121,7 +122,7 @@ export function ThemeToggle() {
   );
 }
 
-export function ScreenHeader({ title, subtitle, onBack }: { title: string; subtitle?: string; onBack: () => void }) {
+export function ScreenHeader({ title, subtitle, onBack, showMenu = false }: { title: string; subtitle?: string; onBack: () => void; showMenu?: boolean }) {
   const { colors, ui } = useUi();
   return (
     <View style={ui.header}>
@@ -132,6 +133,7 @@ export function ScreenHeader({ title, subtitle, onBack }: { title: string; subti
         <Text accessibilityRole="header" style={ui.title}>{title}</Text>
         {subtitle ? <Text style={ui.subtitle}>{subtitle}</Text> : null}
       </View>
+      {showMenu ? <DrawerMenuButton /> : null}
       <ThemeToggle />
     </View>
   );

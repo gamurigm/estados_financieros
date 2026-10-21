@@ -64,6 +64,21 @@ test('bank account creation and updates send account details to the shared API',
   ]);
 });
 
+test('monthly budgets use month-specific read, upsert, and delete requests', async () => {
+  const requests: CapturedRequest[] = [];
+  const api = createFinanceRequests(createRequester(requests));
+
+  await api.loadMonthlyBudget('2026-07');
+  await api.saveMonthlyBudget('2026-07', 340.5);
+  await api.deleteMonthlyBudget('2026-07');
+
+  assert.deepEqual(requests.map(({ url, init }) => ({ url, method: init.method, body: init.body })), [
+    { url: 'https://finance.example/api/budgets/2026-07', method: undefined, body: undefined },
+    { url: 'https://finance.example/api/budgets/2026-07', method: 'PUT', body: JSON.stringify({ amount: 340.5 }) },
+    { url: 'https://finance.example/api/budgets/2026-07', method: 'DELETE', body: undefined },
+  ]);
+});
+
 function createRequester(requests: CapturedRequest[]) {
   const fetcher: typeof fetch = async (input, init = {}) => {
     requests.push({ url: String(input), init });

@@ -7,13 +7,16 @@ import type { AccountId, FinanceState } from '../../src/api/contracts';
 import { sessionManager } from '../../src/auth/session';
 import { MovementList } from '../../src/features/ledger/MovementList';
 import { getMonthlySummary } from '../../src/features/ledger/selectors';
+import { getCurrentMonth } from '../../src/features/ledger/months';
+import { MonthNavigator } from '../../src/features/ledger/MonthNavigator';
+import { DrawerMenuButton } from '../../src/navigation/FinanceDrawer';
 import { Button, createThemedStyles, GlassPanel, ThemeToggle } from '../../src/ui';
 
 const currency = new Intl.NumberFormat('es-EC', { style: 'currency', currency: 'USD' });
 export default function MonthlyLedgerScreen() {
   const { colors, ui, styles } = useStyles();
   const [data, setData] = useState<FinanceState | null>(null);
-  const [month, setMonth] = useState(currentMonth());
+  const [month, setMonth] = useState(getCurrentMonth());
   const [filter, setFilter] = useState<'all' | AccountId>('all');
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -58,20 +61,13 @@ export default function MonthlyLedgerScreen() {
           <Text accessibilityRole="header" style={styles.heading}>Mi libro</Text>
         </View>
         <View style={styles.headerActions}>
+          <DrawerMenuButton />
           <ThemeToggle />
           <Button label="Salir" onPress={() => void logout()} variant="secondary" style={styles.logout} />
         </View>
       </View>
 
-      <View style={styles.monthControl}>
-        <Pressable accessibilityRole="button" accessibilityLabel="Mes anterior" onPress={() => setMonth((value) => moveMonth(value, -1))} style={({ pressed }) => [styles.monthArrow, pressed && ui.pressed]}>
-          <Text style={styles.arrowText}>‹</Text>
-        </Pressable>
-        <Text accessibilityLiveRegion="polite" style={styles.monthText}>{monthLabel(month)}</Text>
-        <Pressable accessibilityRole="button" accessibilityLabel="Mes siguiente" onPress={() => setMonth((value) => moveMonth(value, 1))} style={({ pressed }) => [styles.monthArrow, pressed && ui.pressed]}>
-          <Text style={styles.arrowText}>›</Text>
-        </Pressable>
-      </View>
+      <MonthNavigator month={month} onChange={setMonth} />
       <View style={[ui.segmented, styles.filters]}>
         {[{ id: 'all', label: 'Todas' }, ...(data?.accounts ?? []).map((account) => ({ id: account.id, label: account.name }))].map((option) => {
           const active = filter === option.id;
@@ -194,22 +190,6 @@ function ActionButton({ label, symbol, primary, onPress }: { label: string; symb
   );
 }
 
-function currentMonth() {
-  const now = new Date();
-  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
-}
-
-function moveMonth(month: string, offset: number) {
-  const [year, monthNumber] = month.split('-').map(Number);
-  const date = new Date(year, monthNumber - 1 + offset, 1);
-  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
-}
-
-function monthLabel(month: string) {
-  const label = new Intl.DateTimeFormat('es-EC', { month: 'long', year: 'numeric' }).format(new Date(`${month}-01T12:00:00`));
-  return label.charAt(0).toUpperCase() + label.slice(1);
-}
-
 const useStyles = createThemedStyles(({ colors, ui }) => StyleSheet.create({
   stateContainer: { alignItems: 'center', flex: 1, justifyContent: 'center', padding: 30 },
   stateTitle: { color: colors.ink, fontSize: 22, fontWeight: '800', textAlign: 'center' },
@@ -221,10 +201,6 @@ const useStyles = createThemedStyles(({ colors, ui }) => StyleSheet.create({
   welcome: { color: colors.muted, fontSize: 13 },
   heading: { color: colors.ink, fontSize: 30, fontWeight: '800', letterSpacing: -1, marginTop: 3 },
   logout: { minHeight: 48, paddingVertical: 10 },
-  monthControl: { alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between' },
-  monthArrow: { alignItems: 'center', backgroundColor: colors.surface, borderRadius: 14, height: 48, justifyContent: 'center', width: 48 },
-  arrowText: { color: colors.ink, fontSize: 32, lineHeight: 36, marginTop: -3 },
-  monthText: { color: colors.ink, flex: 1, fontSize: 16, fontWeight: '700', paddingHorizontal: 8, textAlign: 'center' },
   filters: { marginTop: 8, marginBottom: 12, flexWrap: 'wrap' },
   netCard: { backgroundColor: colors.hero, borderColor: colors.heroBorder, borderRadius: 24, padding: 18 },
   heroHeading: { alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between' },

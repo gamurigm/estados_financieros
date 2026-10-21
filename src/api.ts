@@ -14,6 +14,7 @@ export type Movement = {
   toAccount?: AccountId;
   note: string;
 };
+export type MonthlyBudget = { month: string; amount: number };
 export type FinanceState = { categories: Category[]; movements: Movement[]; accounts: Account[]; opening: Record<string, number> };
 
 async function request<T>(url: string, options?: RequestInit): Promise<T> {
@@ -52,3 +53,6 @@ export const saveCategories = (categories: Category[]) => request<void>('/api/ca
 export const saveOpeningBalance = (account: AccountId, openingBalance: number) => request<void>(`/api/accounts/${account}`, { method: 'PUT', body: JSON.stringify({ openingBalance }) });
 export const saveAccount = (account: Pick<Account, 'id' | 'name' | 'openingBalance'>) => request<void>(`/api/accounts/${encodeURIComponent(account.id)}`, { method: 'PUT', body: JSON.stringify({ name: account.name, openingBalance: account.openingBalance }) });
 export const createBankAccount = (account: { name: string; openingBalance: number; startDate?: string }) => request<Account>('/api/accounts', { method: 'POST', body: JSON.stringify(account) });
+export const loadMonthlyBudget = (month: string) => request<MonthlyBudget | null>(`/api/budgets/${encodeURIComponent(month)}`);
+export const saveMonthlyBudget = (month: string, amount: number) => request<MonthlyBudget>(`/api/budgets/${encodeURIComponent(month)}`, { method: 'PUT', body: JSON.stringify({ amount }) });
+export const deleteMonthlyBudget = (month: string) => request<void>(`/api/budgets/${encodeURIComponent(month)}`, { method: 'DELETE' });

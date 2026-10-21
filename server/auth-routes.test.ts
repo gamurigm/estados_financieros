@@ -37,6 +37,9 @@ const protectedRoutes: Route[] = [
   { method: 'PUT', path: '/api/categories', body: [] },
   { method: 'PUT', path: '/api/accounts/cash', body: { openingBalance: 0 } },
   { method: 'POST', path: '/api/accounts', body: { name: 'Banco prueba', openingBalance: 0 } },
+  { method: 'GET', path: '/api/budgets/2026-02' },
+  { method: 'PUT', path: '/api/budgets/2026-02', body: { amount: 100 } },
+  { method: 'DELETE', path: '/api/budgets/2026-02' },
 ];
 
 test('web and Android login return refresh tokens through their approved channels', async () => {
@@ -369,9 +372,63 @@ test('login is limited to ten attempts per IP in fifteen minutes', async () => {
   }
 });
 
+test('owner can read, create, update, and delete monthly budgets', async () => {
+  const harness = await startHarness();
+  try {
+    const tokens = await loginAndroid(harness.baseUrl);
+    const headers = { authorization: `Bearer ${tokens.accessToken}` };
+    const missing = await send(harness.baseUrl, '/api/budgets/2026-02', { headers });
+    assert.equal(missing.status, 200);
+    assert.equal(await missing.json(), null);
+
+    const created = await send(harness.baseUrl, '/api/budgets/2026-02', {
+      method: 'PUT', headers, body: { amount: 425.5 },
+    });
+    assert.equal(created.status, 200);
+    assert.deepEqual(await created.json(), { month: '2026-02', amount: 425.5 });
+
+    const updated = await send(harness.baseUrl, '/api/budgets/2026-02', {
+      method: 'PUT', headers, body: { amount: 500 },
+    });
+    assert.equal(updated.status, 200);
+    assert.deepEqual(await updated.json(), { month: '2026-02', amount: 500 });
+
+    const saved = await send(harness.baseUrl, '/api/budgets/2026-02', { headers });
+    assert.deepEqual(await saved.json(), { month: '2026-02', amount: 500 });
+
+    const deleted = await send(harness.baseUrl, '/api/budgets/2026-02', { method: 'DELETE', headers });
+    assert.equal(deleted.status, 204);
+    const cleared = await send(harness.baseUrl, '/api/budgets/2026-02', { headers });
+    assert.equal(await cleared.json(), null);
+  } finally {
+    await harness.close();
+  }
+});
+
+test('monthly budgets reject invalid months and amounts', async () => {
+  const harness = await startHarness();
+  try {
+    const tokens = await loginAndroid(harness.baseUrl);
+    const headers = { authorization: `Bearer ${tokens.accessToken}` };
+    for (const month of ['2026-13', '2026-2', '0000-01']) {
+      const response = await send(harness.baseUrl, `/api/budgets/${month}`, { headers });
+      assert.equal(response.status, 400, month);
+    }
+    for (const amount of [0, -1, 1.001, 1e15, '100']) {
+      const response = await send(harness.baseUrl, '/api/budgets/2026-02', {
+        method: 'PUT', headers, body: { amount },
+      });
+      assert.equal(response.status, 400, String(amount));
+    }
+  } finally {
+    await harness.close();
+  }
+});
+
 async function startHarness() {
   const store = await createMemoryAuthStore();
   const databaseCalls: string[] = [];
+  const budgets = new Map<string, number>();
   const accounts = [
     { account_key: 'cash', name: 'Efectivo', account_type: 'cash', opening_balance: '0', start_date: '1900-01-01' },
     { account_key: 'bank', name: 'Banco / débito', account_type: 'bank', opening_balance: '0', start_date: '1900-01-01' },
@@ -379,6 +436,20 @@ async function startHarness() {
   const pool = {
     query: async (sql: string, values: unknown[] = []) => {
       databaseCalls.push(sql);
+      if (sql.includes('DELETE FROM monthly_budgets')) {
+        budgets.delete(String(values[0]));
+        return { rows: [], rowCount: 1 };
+      }
+      if (sql.includes('FROM monthly_budgets')) {
+        const monthStart = String(values[0]);
+        const amount = budgets.get(monthStart);
+        return { rows: amount === undefined ? [] : [{ month: monthStart.slice(0, 7), amount: String(amount) }], rowCount: amount === undefined ? 0 : 1 };
+      }
+      if (sql.includes('INSERT INTO monthly_budgets')) {
+        const [monthStart, amount] = values as [string, number];
+        budgets.set(monthStart, amount);
+        return { rows: [{ month: monthStart.slice(0, 7), amount: String(amount) }], rowCount: 1 };
+      }
       if (sql.includes('FROM categories')) return { rows: [], rowCount: 0 };
       if (sql.includes('FROM movements')) return { rows: [], rowCount: 0 };
       if (sql.includes('FROM accounts WHERE account_key')) {

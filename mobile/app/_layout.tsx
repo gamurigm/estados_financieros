@@ -3,6 +3,7 @@ import { StatusBar } from 'expo-status-bar';
 import { View } from 'react-native';
 import { CyberBackground, useUi } from '../src/ui';
 import { ThemeProvider } from '../src/theme/ThemeProvider';
+import { FinanceDrawerProvider } from '../src/navigation/FinanceDrawer';
 
 export default function RootLayout() {
   return <ThemeProvider><AppShell /></ThemeProvider>;
@@ -17,11 +18,13 @@ function AppShell() {
       <View style={{ flex: 1, backgroundColor: colors.background }}>
         <CyberBackground />
         <StatusBar style={mode === 'dark' ? 'light' : 'dark'} />
-        <Stack screenOptions={{
-          headerShown: false,
-          contentStyle: { backgroundColor: 'transparent' },
-          animation: 'fade',
-        }} />
+        <FinanceDrawerProvider>
+          <Stack screenOptions={{
+            headerShown: false,
+            contentStyle: { backgroundColor: 'transparent' },
+            animation: 'fade',
+          }} />
+        </FinanceDrawerProvider>
       </View>
     </NavigationThemeProvider>
   );

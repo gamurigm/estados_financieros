@@ -1,6 +1,6 @@
 import { getApiBaseUrl } from './config';
 import { sessionManager } from '../auth/session';
-import type { Account, AccountId, Category, FinanceState, Movement } from './contracts';
+import type { Account, AccountId, Category, FinanceState, MonthlyBudget, Movement } from './contracts';
 
 const networkError = 'No se pudo conectar al servidor. Revisa tu conexión e inténtalo de nuevo.';
 
@@ -43,6 +43,12 @@ export function createApiRequest({
 export function createFinanceRequests(request: ApiRequester) {
   return {
     loadFinanceState: () => request<FinanceState>('/api/state'),
+    loadMonthlyBudget: (month: string) => request<MonthlyBudget | null>(`/api/budgets/${encodeURIComponent(month)}`),
+    saveMonthlyBudget: (month: string, amount: number) => request<MonthlyBudget>(`/api/budgets/${encodeURIComponent(month)}`, {
+      method: 'PUT',
+      body: JSON.stringify({ amount }),
+    }),
+    deleteMonthlyBudget: (month: string) => request<void>(`/api/budgets/${encodeURIComponent(month)}`, { method: 'DELETE' }),
     saveMovement: (movement: Omit<Movement, 'id'>, id?: string) => {
       const path = id ? `/api/movements/${encodeURIComponent(id)}` : '/api/movements';
       return request<Movement>(path, {
@@ -84,6 +90,9 @@ const financeRequests = createFinanceRequests(request);
 
 export const apiRequest = request;
 export const loadFinanceState = financeRequests.loadFinanceState;
+export const loadMonthlyBudget = financeRequests.loadMonthlyBudget;
+export const saveMonthlyBudget = financeRequests.saveMonthlyBudget;
+export const deleteMonthlyBudget = financeRequests.deleteMonthlyBudget;
 export const saveMovement = financeRequests.saveMovement;
 export const deleteMovement = financeRequests.deleteMovement;
 export const saveCategories = financeRequests.saveCategories;
