@@ -3,11 +3,12 @@
     "name": "Estados financieros",
     "slug": "estados-financieros-android",
     "scheme": "estadosfinancieros",
-    "version": "1.0.0",
+    "version": "1.0.1",
     "icon": "./assets/icon-finance.png",
     "orientation": "portrait",
     "userInterfaceStyle": "light",
     "android": {
+      "versionCode": 2,
       "package": "com.gabrielmurillo.estadosfinancieros",
       "adaptiveIcon": {
         "foregroundImage": "./assets/icon-foreground.png",
