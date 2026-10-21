@@ -33,6 +33,7 @@ import type { Account, AccountId, Category, FinanceState as Data } from './api';
 import { AnalysisPage } from './features/analysis/AnalysisPage';
 import { BalanceSheetPage } from './features/analysis/BalanceSheetPage';
 import { BudgetPage } from './features/budget/BudgetPage';
+import { parseBudgetAmount } from './features/budget/validation';
 import { CashFlowPage } from './features/analysis/CashFlowPage';
 import { FinanceSidebar, type FinanceSection } from './features/navigation/FinanceSidebar';
 import { ThemeToggle } from './ThemeToggle';
@@ -41,6 +42,11 @@ import type { WebThemeMode } from './theme/web-theme';
 const money = new Intl.NumberFormat('es-EC', { style: 'currency', currency: 'USD', minimumFractionDigits: 2 });
 const localDate = (date: Date) => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
 const dateForMonth = (month: string, day: number) => `${month}-${String(day).padStart(2, '0')}`;
+const isValidMovementDate = (date: string) => {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return false;
+  const parsed = new Date(`${date}T00:00:00.000Z`);
+  return Number.isFinite(parsed.getTime()) && parsed.toISOString().slice(0, 10) === date;
+};
 const isWeekend = (date: string) => [0, 6].includes(new Date(`${date}T12:00:00`).getDay());
 const monthLabel = (month: string) => new Intl.DateTimeFormat('es-EC', { month: 'long', year: 'numeric' }).format(new Date(`${month}-01T12:00:00`));
 const accountName = (id: AccountId | undefined, accounts: Account[]) => accounts.find((account) => account.id === id)?.name ?? '';
@@ -61,6 +67,7 @@ export default function App({ themeMode, onThemeToggle, onLogout, onPasswordChan
   const [navigationOpen, setNavigationOpen] = useState(false);
   const [filter, setFilter] = useState<'all' | AccountId>('all');
   const [draft, setDraft] = useState<MovementDraft | null>(null);
+  const [movementError, setMovementError] = useState('');
   const [transfer, setTransfer] = useState<TransferDraft | null>(null);
   const [transferMode, setTransferMode] = useState<'transfer' | 'withdrawal'>('transfer');
   const [categoryOpen, setCategoryOpen] = useState<'income' | 'expense' | null>(null);
@@ -74,6 +81,11 @@ export default function App({ themeMode, onThemeToggle, onLogout, onPasswordChan
   const [passwordSaving, setPasswordSaving] = useState(false);
   const [cell, setCell] = useState<CellSelection | null>(null);
   const [toast, setToast] = useState('');
+
+  const updateDraft = (next: MovementDraft | null) => {
+    setDraft(next);
+    setMovementError('');
+  };
   const activeCategories = data.categories.filter((category) => category.active);
   const days = new Date(Number(month.slice(0, 4)), Number(month.slice(5, 7)), 0).getDate();
   const monthMovements = useMemo(() => data.movements.filter((movement) => movement.date.startsWith(month)), [data.movements, month]);
@@ -100,11 +112,17 @@ export default function App({ themeMode, onThemeToggle, onLogout, onPasswordChan
   const runChange = async (change: () => Promise<unknown>, success: string) => {
     try {
       await change();
-      await refreshData();
-      setToast(success);
     } catch (error) {
       setToast(error instanceof Error ? error.message : 'No se pudo guardar.');
+      return false;
     }
+    try {
+      await refreshData();
+      setToast(success);
+    } catch {
+      setToast('Cambio guardado, pero no se pudo actualizar la vista.');
+    }
+    return true;
   };
 
   const balanceAt = (accountId: AccountId) => {
@@ -120,8 +138,10 @@ export default function App({ themeMode, onThemeToggle, onLogout, onPasswordChan
     }, account.openingBalance);
   };
 
-  const totalForCell = (categoryId: string, date: string) => visibleMovements
-    .filter((movement) => movement.date === date && movement.categoryId === categoryId)
+  const movementsForCell = (categoryId: string, date: string) => visibleMovements
+    .filter((movement) => movement.date === date && movement.categoryId === categoryId);
+
+  const totalForCell = (categoryId: string, date: string) => movementsForCell(categoryId, date)
     .reduce((sum, movement) => sum + movement.amount, 0);
 
   const makeDraft = (kind: 'income' | 'expense', date = localDate(new Date()), categoryId = ''): MovementDraft => ({
@@ -133,19 +153,36 @@ export default function App({ themeMode, onThemeToggle, onLogout, onPasswordChan
     note: '',
   });
 
+  const openMovement = (movement: Data['movements'][number]) => {
+    setCell(null);
+    updateDraft({ id: movement.id, date: movement.date, kind: movement.kind as 'income' | 'expense', amount: String(movement.amount), categoryId: movement.categoryId ?? '', account: (movement.kind === 'income' ? movement.toAccount : movement.account) ?? 'cash', note: movement.note });
+  };
+
+  const openCell = (date: string, category: Category) => {
+    const movements = movementsForCell(category.id, date);
+    if (movements.length === 1) return openMovement(movements[0]);
+    if (movements.length > 1) return setCell({ date, category });
+    updateDraft(makeDraft(category.kind, date, category.id));
+  };
+
   const saveMovement = async () => {
-    if (!draft || !draft.amount || Number(draft.amount) <= 0 || !draft.categoryId) return;
+    if (!draft) return;
+    const amount = parseBudgetAmount(draft.amount);
+    if (amount === null) return setMovementError('Ingresa un monto positivo con hasta 2 decimales.');
+    if (!isValidMovementDate(draft.date)) return setMovementError('Elige una fecha válida.');
+    if (!activeCategories.some((category) => category.id === draft.categoryId && category.kind === draft.kind)) return setMovementError('Elige un rubro activo del tipo seleccionado.');
+    if (!data.accounts.some((account) => account.id === draft.account)) return setMovementError('Elige una cuenta válida.');
     const movement = {
       ...(draft.id ? { id: draft.id } : {}),
       date: draft.date,
       kind: draft.kind,
-      amount: Number(draft.amount),
+      amount,
       categoryId: draft.categoryId,
       ...(draft.kind === 'income' ? { toAccount: draft.account } : { account: draft.account }),
       note: draft.note.trim(),
     };
-    await runChange(() => saveMovementRequest(movement), 'Movimiento guardado');
-    setDraft(null);
+    if (!await runChange(() => saveMovementRequest(movement), 'Movimiento guardado')) return;
+    updateDraft(null);
     setCell(null);
   };
 
@@ -240,7 +277,7 @@ export default function App({ themeMode, onThemeToggle, onLogout, onPasswordChan
               <IonButton fill="outline" className="quiet-button" onClick={() => setCategoryOpen('expense')}><IonIcon slot="start" icon={createOutline} /><span className="action-label">Rubros</span></IonButton>
               <IonButton fill="outline" className="quiet-button" onClick={startTransfer} disabled={!bankAccounts.length}><IonIcon slot="start" icon={swapHorizontalOutline} /><span className="action-label">Transferir</span></IonButton>
               <IonButton fill="outline" className="quiet-button" onClick={startWithdrawal} disabled={!bankAccounts.length}><IonIcon slot="start" icon={cashOutline} /><span className="action-label">Retirar</span></IonButton>
-              <IonButton className="add-button" onClick={() => setDraft(makeDraft('expense'))}><IonIcon slot="start" icon={addOutline} /><span className="action-label">Registrar</span></IonButton>
+              <IonButton className="add-button" onClick={() => updateDraft(makeDraft('expense'))}><IonIcon slot="start" icon={addOutline} /><span className="action-label">Registrar</span></IonButton>
               <IonButton fill="outline" className="quiet-button" onClick={() => { setPasswordDraft({ current: '', next: '', confirm: '' }); setPasswordError(''); setPasswordOpen(true); }}><IonIcon slot="start" icon={lockClosedOutline} /><span className="action-label">Cambiar contraseña</span></IonButton>
               <IonButton fill="outline" className="quiet-button" onClick={onLogout}><IonIcon slot="start" icon={logOutOutline} /><span className="action-label">Cerrar sesión</span></IonButton>
             </div>
@@ -281,7 +318,7 @@ export default function App({ themeMode, onThemeToggle, onLogout, onPasswordChan
 
           <section className="sheet-section">
             <div className="sheet-heading">
-              <div><h2>{monthLabel(month)}</h2><p>Selecciona una celda para ver o agregar movimientos.</p></div>
+              <div><h2>{monthLabel(month)}</h2><p>Haz clic en una celda para editar o agregar movimientos.</p></div>
               <span className="sheet-hint"><IonIcon icon={cashOutline} /> Valores en USD</span>
             </div>
             <div className="sheet-scroll" role="region" aria-label="Tabla mensual de ingresos y gastos" tabIndex={0}>
@@ -291,10 +328,10 @@ export default function App({ themeMode, onThemeToggle, onLogout, onPasswordChan
                 </thead>
                 <tbody>
                   <tr className="section-row income-section"><th colSpan={days + 2}>Ingresos <span>· {money.format(incomeTotal)}</span><button onClick={() => setCategoryOpen('income')} aria-label="Agregar rubro de ingreso"><IonIcon icon={addOutline} /></button></th></tr>
-                  {activeCategories.filter((category) => category.kind === 'income').map((category) => <tr className="category-row income-row" key={category.id}><th className="category-column"><span>{category.name}</span><small>Ingreso</small></th>{Array.from({ length: days }, (_, index) => { const date = dateForMonth(month, index + 1); const amount = totalForCell(category.id, date); return <td key={date} className={isWeekend(date) ? 'weekend-cell' : undefined}><button className={`cell-value ${amount ? 'has-value' : ''}`} onClick={() => setCell({ date, category })} aria-label={`${category.name}, día ${index + 1}, ${money.format(amount)}`}>{amount ? money.format(amount) : <span className="empty-cell">·</span>}</button></td>; })}<td className="row-total">{money.format(Array.from({ length: days }, (_, index) => totalForCell(category.id, dateForMonth(month, index + 1))).reduce((sum, amount) => sum + amount, 0))}</td></tr>)}
+                  {activeCategories.filter((category) => category.kind === 'income').map((category) => <tr className="category-row income-row" key={category.id}><th className="category-column"><span>{category.name}</span><small>Ingreso</small></th>{Array.from({ length: days }, (_, index) => { const date = dateForMonth(month, index + 1); const amount = totalForCell(category.id, date); return <td key={date} className={isWeekend(date) ? 'weekend-cell' : undefined}><button className={`cell-value ${amount ? 'has-value' : ''}`} onClick={() => openCell(date, category)} title={amount ? 'Clic para editar' : 'Clic para registrar'} aria-label={`${amount ? 'Editar' : 'Registrar'} ${category.name}, día ${index + 1}, ${money.format(amount)}`}>{amount ? money.format(amount) : <span className="empty-cell">·</span>}</button></td>; })}<td className="row-total">{money.format(Array.from({ length: days }, (_, index) => totalForCell(category.id, dateForMonth(month, index + 1))).reduce((sum, amount) => sum + amount, 0))}</td></tr>)}
                   <tr className="daily-total income-daily"><th className="category-column">Total ingresos</th>{Array.from({ length: days }, (_, index) => { const date = dateForMonth(month, index + 1); return <td key={date} className={isWeekend(date) ? 'weekend-cell' : undefined}>{money.format(visibleMovements.filter((movement) => movement.kind === 'income' && movement.date === date).reduce((sum, movement) => sum + movement.amount, 0))}</td>; })}<td className="row-total">{money.format(incomeTotal)}</td></tr>
                   <tr className="section-row expense-section"><th colSpan={days + 2}>Gastos <span>· {money.format(expenseTotal)}</span><button onClick={() => setCategoryOpen('expense')} aria-label="Agregar rubro de gasto"><IonIcon icon={addOutline} /></button></th></tr>
-                  {activeCategories.filter((category) => category.kind === 'expense').map((category) => <tr className="category-row expense-row" key={category.id}><th className="category-column"><span>{category.name}</span><small>Gasto</small></th>{Array.from({ length: days }, (_, index) => { const date = dateForMonth(month, index + 1); const amount = totalForCell(category.id, date); return <td key={date} className={isWeekend(date) ? 'weekend-cell' : undefined}><button className={`cell-value ${amount ? 'has-value' : ''}`} onClick={() => setCell({ date, category })} aria-label={`${category.name}, día ${index + 1}, ${money.format(amount)}`}>{amount ? money.format(amount) : <span className="empty-cell">·</span>}</button></td>; })}<td className="row-total">{money.format(Array.from({ length: days }, (_, index) => totalForCell(category.id, dateForMonth(month, index + 1))).reduce((sum, amount) => sum + amount, 0))}</td></tr>)}
+                  {activeCategories.filter((category) => category.kind === 'expense').map((category) => <tr className="category-row expense-row" key={category.id}><th className="category-column"><span>{category.name}</span><small>Gasto</small></th>{Array.from({ length: days }, (_, index) => { const date = dateForMonth(month, index + 1); const amount = totalForCell(category.id, date); return <td key={date} className={isWeekend(date) ? 'weekend-cell' : undefined}><button className={`cell-value ${amount ? 'has-value' : ''}`} onClick={() => openCell(date, category)} title={amount ? 'Clic para editar' : 'Clic para registrar'} aria-label={`${amount ? 'Editar' : 'Registrar'} ${category.name}, día ${index + 1}, ${money.format(amount)}`}>{amount ? money.format(amount) : <span className="empty-cell">·</span>}</button></td>; })}<td className="row-total">{money.format(Array.from({ length: days }, (_, index) => totalForCell(category.id, dateForMonth(month, index + 1))).reduce((sum, amount) => sum + amount, 0))}</td></tr>)}
                   <tr className="daily-total expense-daily"><th className="category-column">Total gastos</th>{Array.from({ length: days }, (_, index) => { const date = dateForMonth(month, index + 1); return <td key={date} className={isWeekend(date) ? 'weekend-cell' : undefined}>{money.format(visibleMovements.filter((movement) => movement.kind === 'expense' && movement.date === date).reduce((sum, movement) => sum + movement.amount, 0))}</td>; })}<td className="row-total">{money.format(expenseTotal)}</td></tr>
                   <tr className="net-daily"><th className="category-column">Balance diario</th>{Array.from({ length: days }, (_, index) => { const date = dateForMonth(month, index + 1); const total = visibleMovements.filter((movement) => movement.date === date); return <td key={date} className={isWeekend(date) ? 'weekend-cell' : undefined}>{money.format(total.filter((movement) => movement.kind === 'income').reduce((sum, movement) => sum + movement.amount, 0) - total.filter((movement) => movement.kind === 'expense').reduce((sum, movement) => sum + movement.amount, 0))}</td>; })}<td className="row-total">{money.format(incomeTotal - expenseTotal)}</td></tr>
                 </tbody>
@@ -311,17 +348,17 @@ export default function App({ themeMode, onThemeToggle, onLogout, onPasswordChan
         </main>
       </IonContent>
 
-      <IonModal isOpen={!!draft} onDidDismiss={() => setDraft(null)} className="form-modal">
+      <IonModal isOpen={!!draft} onDidDismiss={() => updateDraft(null)} className="form-modal">
         <div className="modal-shell">
-          <div className="modal-heading"><div><span className="modal-kicker">MOVIMIENTO</span><h2>{draft?.id ? 'Editar movimiento' : draft?.kind === 'income' ? 'Registrar ingreso' : 'Registrar gasto'}</h2></div><button className="icon-close" onClick={() => setDraft(null)} aria-label="Cerrar"><IonIcon icon={closeOutline} /></button></div>
+          <div className="modal-heading"><div><span className="modal-kicker">MOVIMIENTO</span><h2>{draft?.id ? 'Editar movimiento' : draft?.kind === 'income' ? 'Registrar ingreso' : 'Registrar gasto'}</h2></div><button className="icon-close" onClick={() => updateDraft(null)} aria-label="Cerrar"><IonIcon icon={closeOutline} /></button></div>
           {draft && <div className="form-fields">
-            <div className="kind-switch"><button className={draft.kind === 'income' ? 'active income-active' : ''} onClick={() => setDraft({ ...draft, kind: 'income', categoryId: activeCategories.find((category) => category.kind === 'income')?.id ?? '' })}>Ingreso</button><button className={draft.kind === 'expense' ? 'active expense-active' : ''} onClick={() => setDraft({ ...draft, kind: 'expense', categoryId: activeCategories.find((category) => category.kind === 'expense')?.id ?? '' })}>Gasto</button></div>
-            <IonItem className="form-item"><IonInput label="Monto" labelPlacement="stacked" type="number" min="0.01" step="0.01" placeholder="0,00" value={draft.amount} onIonInput={(event) => setDraft({ ...draft, amount: String(event.detail.value ?? '') })} /></IonItem>
-            <IonItem className="form-item"><IonSelect label="Rubro" labelPlacement="stacked" interface="popover" value={draft.categoryId} onIonChange={(event) => setDraft({ ...draft, categoryId: event.detail.value })}>{activeCategories.filter((category) => category.kind === draft.kind).map((category) => <IonSelectOption key={category.id} value={category.id}>{category.name}</IonSelectOption>)}</IonSelect></IonItem>
-            <IonItem className="form-item"><IonSelect label={draft.kind === 'income' ? 'Recibir en' : 'Pagar con'} labelPlacement="stacked" interface="popover" value={draft.account} onIonChange={(event) => setDraft({ ...draft, account: event.detail.value })}>{data.accounts.map((account) => <IonSelectOption key={account.id} value={account.id}>{account.name}</IonSelectOption>)}</IonSelect></IonItem>
-            <IonItem className="form-item"><IonInput label="Fecha" labelPlacement="stacked" type="date" value={draft.date} onIonInput={(event) => setDraft({ ...draft, date: String(event.detail.value ?? '') })} /></IonItem>
-            <IonItem className="form-item note-item"><IonTextarea label="Descripción (opcional)" labelPlacement="stacked" autoGrow rows={2} value={draft.note} onIonInput={(event) => setDraft({ ...draft, note: String(event.detail.value ?? '') })} /></IonItem>
-            <div className="modal-actions">{draft.id && <IonButton fill="clear" color="danger" onClick={() => { removeMovement(draft.id!); setDraft(null); }}>Eliminar</IonButton>}<IonButton fill="outline" onClick={() => setDraft(null)}>Cancelar</IonButton><IonButton onClick={saveMovement}>Guardar</IonButton></div>
+            <div className="kind-switch"><button className={draft.kind === 'income' ? 'active income-active' : ''} onClick={() => updateDraft({ ...draft, kind: 'income', categoryId: activeCategories.find((category) => category.kind === 'income')?.id ?? '' })}>Ingreso</button><button className={draft.kind === 'expense' ? 'active expense-active' : ''} onClick={() => updateDraft({ ...draft, kind: 'expense', categoryId: activeCategories.find((category) => category.kind === 'expense')?.id ?? '' })}>Gasto</button></div>
+            <IonItem className="form-item"><IonInput label="Monto" labelPlacement="stacked" type="number" min="0.01" step="0.01" placeholder="0,00" value={draft.amount} onIonInput={(event) => updateDraft({ ...draft, amount: String(event.detail.value ?? '') })} /></IonItem>
+            <IonItem className="form-item"><IonSelect label="Rubro" labelPlacement="stacked" interface="popover" value={draft.categoryId} onIonChange={(event) => updateDraft({ ...draft, categoryId: event.detail.value })}>{activeCategories.filter((category) => category.kind === draft.kind).map((category) => <IonSelectOption key={category.id} value={category.id}>{category.name}</IonSelectOption>)}</IonSelect></IonItem>
+            <IonItem className="form-item"><IonSelect label={draft.kind === 'income' ? 'Recibir en' : 'Pagar con'} labelPlacement="stacked" interface="popover" value={draft.account} onIonChange={(event) => updateDraft({ ...draft, account: event.detail.value })}>{data.accounts.map((account) => <IonSelectOption key={account.id} value={account.id}>{account.name}</IonSelectOption>)}</IonSelect></IonItem>
+            <IonItem className="form-item"><IonInput label="Fecha" labelPlacement="stacked" type="date" value={draft.date} onIonInput={(event) => updateDraft({ ...draft, date: String(event.detail.value ?? '') })} /></IonItem>
+            <IonItem className="form-item note-item"><IonTextarea label="Descripción (opcional)" labelPlacement="stacked" autoGrow rows={2} value={draft.note} onIonInput={(event) => updateDraft({ ...draft, note: String(event.detail.value ?? '') })} /></IonItem>
+            {movementError && <div role="alert" className="login-error movement-validation">{movementError}</div>}<div className="modal-actions">{draft.id && <IonButton fill="clear" color="danger" onClick={() => { removeMovement(draft.id!); updateDraft(null); }}>Eliminar</IonButton>}<IonButton fill="outline" onClick={() => updateDraft(null)}>Cancelar</IonButton><IonButton onClick={saveMovement}>Guardar</IonButton></div>
           </div>}
         </div>
       </IonModal>
@@ -330,8 +367,8 @@ export default function App({ themeMode, onThemeToggle, onLogout, onPasswordChan
         <div className="modal-shell cell-modal">
           <div className="modal-heading"><div><span className="modal-kicker">{cell?.category.kind === 'income' ? 'INGRESOS' : 'GASTOS'} · {cell?.date}</span><h2>{cell?.category.name}</h2></div><button className="icon-close" onClick={() => setCell(null)} aria-label="Cerrar"><IonIcon icon={closeOutline} /></button></div>
           {cell && <>
-            <div className="cell-movements">{categoryMovements.length ? categoryMovements.map((movement) => <article className="movement-line" key={movement.id}><div><strong>{money.format(movement.amount)}</strong><span>{accountName(movement.kind === 'income' ? movement.toAccount : movement.account, data.accounts)}{movement.note ? ` · ${movement.note}` : ''}</span></div><button aria-label="Editar movimiento" onClick={() => { setCell(null); setDraft({ id: movement.id, date: movement.date, kind: movement.kind as 'income' | 'expense', amount: String(movement.amount), categoryId: movement.categoryId ?? '', account: (movement.kind === 'income' ? movement.toAccount : movement.account) ?? 'cash', note: movement.note }); }}><IonIcon icon={createOutline} /></button><button aria-label="Eliminar movimiento" onClick={() => removeMovement(movement.id)}><IonIcon icon={closeOutline} /></button></article>) : <p className="empty-state">No hay movimientos para este rubro y día.</p>}</div>
-            <IonButton expand="block" onClick={() => { const next = makeDraft(cell.category.kind, cell.date, cell.category.id); setCell(null); setDraft(next); }}><IonIcon slot="start" icon={addOutline} /> Agregar movimiento</IonButton>
+            <div className="cell-movements">{categoryMovements.length ? categoryMovements.map((movement) => <article className="movement-line" key={movement.id}><div><strong>{money.format(movement.amount)}</strong><span>{accountName(movement.kind === 'income' ? movement.toAccount : movement.account, data.accounts)}{movement.note ? ` · ${movement.note}` : ''}</span></div><button aria-label="Editar movimiento" onClick={() => openMovement(movement)}><IonIcon icon={createOutline} /></button><button aria-label="Eliminar movimiento" onClick={() => removeMovement(movement.id)}><IonIcon icon={closeOutline} /></button></article>) : <p className="empty-state">No hay movimientos para este rubro y día.</p>}</div>
+            <IonButton expand="block" onClick={() => { const next = makeDraft(cell.category.kind, cell.date, cell.category.id); setCell(null); updateDraft(next); }}><IonIcon slot="start" icon={addOutline} /> Agregar movimiento</IonButton>
           </>}
         </div>
       </IonModal>
