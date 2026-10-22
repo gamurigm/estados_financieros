@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import {
-  IonApp,
   IonButton,
   IonContent,
   IonIcon,
@@ -280,7 +279,7 @@ export default function App({ themeMode, onThemeToggle, onLogout, onPasswordChan
   };
 
   return (
-    <IonApp>
+    <>
       <IonContent fullscreen>
         <main className="workspace">
           <header className="topbar">
@@ -461,7 +460,7 @@ export default function App({ themeMode, onThemeToggle, onLogout, onPasswordChan
         </div>
       </IonModal>
       <IonToast isOpen={!!toast} message={toast} duration={2200} onDidDismiss={() => setToast('')} position="bottom" />
-    </IonApp>
+    </>
   );
 }
 

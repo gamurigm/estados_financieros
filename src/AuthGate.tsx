@@ -74,18 +74,18 @@ export default function AuthGate() {
     }
   };
 
-  if (session === 'checking') {
-    return <IonApp><IonContent fullscreen className="auth-content"><div className="auth-loading"><IonSpinner name="crescent" /><span>Revisando tu sesión…</span></div></IonContent></IonApp>;
-  }
-
-  if (session === 'anonymous') {
-    return <LoginScreen error={error} notice={notice} submitting={submitting} themeMode={themeMode} onThemeToggle={toggleTheme} onSubmit={login} />;
-  }
-
-  return <App themeMode={themeMode} onThemeToggle={toggleTheme} onLogout={() => { void logout(); }} onPasswordChanged={() => {
-    activeSession.current = false;
-    setError('');
-    setNotice('Contraseña actualizada. Ingresa con tu nueva contraseña.');
-    setSession('anonymous');
-  }} />;
+  return (
+    <IonApp>
+      {session === 'checking'
+        ? <IonContent fullscreen className="auth-content"><div className="auth-loading"><IonSpinner name="crescent" /><span>Revisando tu sesión…</span></div></IonContent>
+        : session === 'anonymous'
+          ? <LoginScreen error={error} notice={notice} submitting={submitting} themeMode={themeMode} onThemeToggle={toggleTheme} onSubmit={login} />
+          : <App themeMode={themeMode} onThemeToggle={toggleTheme} onLogout={() => { void logout(); }} onPasswordChanged={() => {
+            activeSession.current = false;
+            setError('');
+            setNotice('Contraseña actualizada. Ingresa de nuevo.');
+            setSession('anonymous');
+          }} />}
+    </IonApp>
+  );
 }
