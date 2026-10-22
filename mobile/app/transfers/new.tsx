@@ -13,14 +13,18 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useLocalSearchParams } from 'expo-router';
 import { apiRequest, saveMovement } from '../../src/api/client';
 import type { Account, AccountId, FinanceState } from '../../src/api/contracts';
+import { getAccountBalanceAsOf } from '../../src/features/ledger/selectors';
 import { parseAmount, validateTransfer, type TransferDraft } from '../../src/features/movements/validation';
 import { Button, Input, ScreenHeader, createThemedStyles, GlassPanel } from '../../src/ui';
+
+const currency = new Intl.NumberFormat('es-EC', { style: 'currency', currency: 'USD' });
 
 export default function NewTransferScreen() {
   const { mode } = useLocalSearchParams<{ mode?: string }>();
   const withdrawal = mode === 'withdrawal';
   const { ui, styles } = useStyles();
   const [accounts, setAccounts] = useState<Account[]>([]);
+  const [financeState, setFinanceState] = useState<FinanceState | null>(null);
   const [loading, setLoading] = useState(true);
   const [retry, setRetry] = useState(0);
   const [draft, setDraft] = useState<TransferDraft>({
@@ -37,6 +41,7 @@ export default function NewTransferScreen() {
     setError('');
     apiRequest<FinanceState>('/api/state').then((state) => {
       if (!active) return;
+      setFinanceState(state);
       setAccounts(state.accounts);
       const bank = state.accounts.find((account) => account.kind === 'bank');
       const cashAccount = state.accounts.find((account) => account.kind === 'cash');
@@ -59,7 +64,10 @@ export default function NewTransferScreen() {
       setError('Selecciona una cuenta bancaria válida.');
       return;
     }
-    const validation = validateTransfer(draft);
+    const availableBalance = financeState
+      ? getAccountBalanceAsOf(financeState, draft.account, draft.date)
+      : 0;
+    const validation = validateTransfer(draft, availableBalance);
     if (!validation.ok) {
       setError(validation.message);
       return;
@@ -93,6 +101,21 @@ export default function NewTransferScreen() {
     }
   }
 
+  function availableAt(accountId: AccountId) {
+    return financeState ? getAccountBalanceAsOf(financeState, accountId, draft.date) : 0;
+  }
+
+  function changeSource(account: AccountId) {
+    setDraft((current) => ({
+      ...current,
+      account,
+      ...(!withdrawal && current.toAccount === account
+        ? { toAccount: accounts.find((item) => item.id !== account)?.id ?? current.toAccount }
+        : {}),
+    }));
+    setError('');
+  }
+
   if (loading) return <SafeAreaView style={styles.safeArea}><View style={styles.state}><Text style={styles.helper}>Cargando cuentas…</Text></View></SafeAreaView>;
   if (!accounts.length) return <SafeAreaView style={styles.safeArea}><ScreenHeader title={withdrawal ? 'Retirar efectivo' : 'Transferir dinero'} subtitle="No se cargaron tus cuentas" onBack={() => router.back()} /><View style={styles.state}><Text style={styles.helper}>{error || 'No se pudieron cargar las cuentas.'}</Text><Button label="Reintentar" onPress={() => { setLoading(true); setRetry((value) => value + 1); }} style={styles.submitButton} /></View></SafeAreaView>;
   if (withdrawal && !banks.length) return <SafeAreaView style={styles.safeArea}><ScreenHeader title="Retirar efectivo" subtitle="De tu banco al efectivo" onBack={() => router.back()} /><View style={styles.state}><Text style={styles.helper}>{error || 'Agrega una cuenta bancaria para registrar retiros.'}</Text><Button label="Agregar cuenta" onPress={() => router.push('/balances')} style={styles.submitButton} /></View></SafeAreaView>;
@@ -104,10 +127,11 @@ export default function NewTransferScreen() {
         <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag">
           <GlassPanel style={styles.card}>
             <Text style={styles.helper}>{withdrawal ? 'Se resta de la cuenta bancaria y se suma al efectivo.' : 'El traslado cambia los saldos, pero no cuenta como ingreso ni gasto.'}</Text>
+            <Text style={styles.dateHint}>Saldos disponibles al {draft.date}</Text>
             <Text style={styles.label}>Monto (USD)</Text>
             <Input accessibilityLabel="Monto en dólares" editable={savedId === null && !saving} keyboardType="decimal-pad" onChangeText={(amount) => { setDraft((current) => ({ ...current, amount })); setError(''); }} placeholder="0,00" style={ui.amount} value={draft.amount} />
-            <AccountPicker accounts={withdrawal ? banks : accounts} disabled={savedId !== null || saving} label="Desde" value={draft.account} onChange={(account) => { setDraft((current) => ({ ...current, account })); setError(''); }} />
-            {withdrawal ? <Text style={styles.label}>Hacia: {cash?.name ?? 'Efectivo'}</Text> : <AccountPicker accounts={accounts} disabled={savedId !== null || saving} label="Hacia" value={draft.toAccount} onChange={(toAccount) => { setDraft((current) => ({ ...current, toAccount })); setError(''); }} />}
+            <AccountPicker accounts={withdrawal ? banks : accounts} balanceForAccount={availableAt} disabled={savedId !== null || saving} label="Desde" value={draft.account} onChange={changeSource} />
+            {withdrawal ? <><Text style={styles.label}>Hacia: {cash?.name ?? 'Efectivo'}</Text><Text style={styles.dateHint}>Saldo al {draft.date}: {currency.format(cash ? availableAt(cash.id) : 0)}</Text></> : <AccountPicker accounts={accounts.filter((account) => account.id !== draft.account)} balanceForAccount={availableAt} disabled={savedId !== null || saving} label="Hacia" value={draft.toAccount} onChange={(toAccount) => { setDraft((current) => ({ ...current, toAccount })); setError(''); }} />}
             <Text style={styles.label}>Fecha</Text>
             <Input accessibilityLabel="Fecha" editable={savedId === null && !saving} keyboardType="numbers-and-punctuation" onChangeText={(date) => { setDraft((current) => ({ ...current, date })); setError(''); }} placeholder="AAAA-MM-DD" value={draft.date} />
             <Text style={styles.dateHint}>Formato: AAAA-MM-DD</Text>
@@ -122,7 +146,7 @@ export default function NewTransferScreen() {
   );
 }
 
-function AccountPicker({ accounts, label, value, disabled, onChange }: { accounts: Account[]; label: string; value: AccountId; disabled: boolean; onChange: (account: AccountId) => void }) {
+function AccountPicker({ accounts, balanceForAccount, label, value, disabled, onChange }: { accounts: Account[]; balanceForAccount: (account: AccountId) => number; label: string; value: AccountId; disabled: boolean; onChange: (account: AccountId) => void }) {
   const { ui, styles } = useStyles();
   return (
     <View>
@@ -131,8 +155,9 @@ function AccountPicker({ accounts, label, value, disabled, onChange }: { account
         {accounts.map((account) => {
           const selected = account.id === value;
           return (
-            <Pressable accessibilityRole="button" accessibilityState={{ selected, disabled }} disabled={disabled} key={account.id} onPress={() => onChange(account.id)} style={({ pressed }) => [styles.accountOption, selected && styles.accountOptionActive, disabled && ui.disabled, pressed && ui.pressed]}>
+            <Pressable accessibilityRole="button" accessibilityLabel={`${account.name}, disponible ${currency.format(balanceForAccount(account.id))}`} accessibilityState={{ selected, disabled }} disabled={disabled} key={account.id} onPress={() => onChange(account.id)} style={({ pressed }) => [styles.accountOption, selected && styles.accountOptionActive, disabled && ui.disabled, pressed && ui.pressed]}>
               <Text numberOfLines={2} style={[styles.accountText, selected && styles.accountTextActive]}>{selected ? '✓ ' : ''}{account.name}</Text>
+              <Text style={[styles.accountBalance, selected && styles.accountTextActive]}>{currency.format(balanceForAccount(account.id))}</Text>
             </Pressable>
           );
         })}
@@ -159,6 +184,7 @@ const useStyles = createThemedStyles(({ colors, ui }) => StyleSheet.create({
   accountOptionActive: { backgroundColor: colors.tint, borderColor: colors.primary },
   accountText: { color: colors.muted, fontSize: 14, fontWeight: '600' },
   accountTextActive: { color: colors.primary, fontWeight: '800' },
+  accountBalance: { color: colors.muted, fontSize: 12, marginTop: 5 },
   state: { alignItems: 'center', flex: 1, justifyContent: 'center', padding: 24 },
   submitButton: { marginTop: 28 },
 }));

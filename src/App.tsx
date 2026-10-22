@@ -70,6 +70,8 @@ export default function App({ themeMode, onThemeToggle, onLogout, onPasswordChan
   const [movementError, setMovementError] = useState('');
   const [transfer, setTransfer] = useState<TransferDraft | null>(null);
   const [transferMode, setTransferMode] = useState<'transfer' | 'withdrawal'>('transfer');
+  const [transferError, setTransferError] = useState('');
+  const [transferSaving, setTransferSaving] = useState(false);
   const [categoryOpen, setCategoryOpen] = useState<'income' | 'expense' | null>(null);
   const [balanceOpen, setBalanceOpen] = useState(false);
   const [accountDrafts, setAccountDrafts] = useState<Record<AccountId, { name: string; balance: string }>>({});
@@ -90,7 +92,8 @@ export default function App({ themeMode, onThemeToggle, onLogout, onPasswordChan
   const activeCategories = data.categories.filter((category) => category.active);
   const days = new Date(Number(month.slice(0, 4)), Number(month.slice(5, 7)), 0).getDate();
   const monthMovements = useMemo(() => data.movements.filter((movement) => movement.date.startsWith(month)), [data.movements, month]);
-  const visibleMovements = monthMovements.filter((movement) => filter === 'all' || movement.account === filter || (movement.kind === 'income' && movement.toAccount === filter));
+  const visibleMovements = monthMovements.filter((movement) => filter === 'all' || movement.account === filter || movement.toAccount === filter);
+  const visibleTransfers = visibleMovements.filter((movement) => movement.kind === 'transfer');
   const incomeTotal = visibleMovements.filter((movement) => movement.kind === 'income').reduce((sum, movement) => sum + movement.amount, 0);
   const expenseTotal = visibleMovements.filter((movement) => movement.kind === 'expense').reduce((sum, movement) => sum + movement.amount, 0);
   const monthEnd = dateForMonth(month, days);
@@ -126,16 +129,16 @@ export default function App({ themeMode, onThemeToggle, onLogout, onPasswordChan
     return true;
   };
 
-  const balanceAt = (accountId: AccountId) => {
+  const balanceAt = (accountId: AccountId, asOfDate = monthEnd) => {
     const account = data.accounts.find((item) => item.id === accountId);
-    if (!account || account.startDate > monthEnd) return 0;
+    if (!account || account.startDate > asOfDate) return 0;
     return data.movements.reduce((balance, movement) => {
-    if (movement.date < account.startDate || movement.date > monthEnd) return balance;
-    if (movement.kind === 'income' && movement.toAccount === accountId) return balance + movement.amount;
-    if (movement.kind === 'expense' && movement.account === accountId) return balance - movement.amount;
-    if (movement.kind === 'transfer' && movement.account === accountId) return balance - movement.amount;
-    if (movement.kind === 'transfer' && movement.toAccount === accountId) return balance + movement.amount;
-    return balance;
+      if (movement.date < account.startDate || movement.date > asOfDate) return balance;
+      if (movement.kind === 'income' && movement.toAccount === accountId) return balance + movement.amount;
+      if (movement.kind === 'expense' && movement.account === accountId) return balance - movement.amount;
+      if (movement.kind === 'transfer' && movement.account === accountId) return balance - movement.amount;
+      if (movement.kind === 'transfer' && movement.toAccount === accountId) return balance + movement.amount;
+      return balance;
     }, account.openingBalance);
   };
 
@@ -204,10 +207,23 @@ export default function App({ themeMode, onThemeToggle, onLogout, onPasswordChan
   };
 
   const saveTransfer = async () => {
-    if (!transfer || !transfer.amount || Number(transfer.amount) <= 0 || transfer.account === transfer.toAccount) return;
-    const movement = { date: transfer.date, kind: 'transfer' as const, amount: Number(transfer.amount), account: transfer.account, toAccount: transfer.toAccount, note: transfer.note.trim() };
-    await runChange(() => saveMovementRequest(movement), transferMode === 'withdrawal' ? 'Retiro guardado' : 'Transferencia guardada');
-    setTransfer(null);
+    if (!transfer) return;
+    const amount = parseBudgetAmount(transfer.amount);
+    if (amount === null) return setTransferError('Ingresa un monto positivo con hasta 2 decimales.');
+    if (!isValidMovementDate(transfer.date)) return setTransferError('Elige una fecha válida.');
+    const source = data.accounts.find((account) => account.id === transfer.account);
+    const target = data.accounts.find((account) => account.id === transfer.toAccount);
+    if (!source || !target || transfer.account === transfer.toAccount
+      || (transferMode === 'withdrawal' && (source.kind !== 'bank' || target.kind !== 'cash'))) {
+      return setTransferError('Elige cuentas válidas y distintas.');
+    }
+    const available = balanceAt(transfer.account, transfer.date);
+    if (Math.round(amount * 100) > Math.round(available * 100)) return setTransferError(`Saldo insuficiente. Disponible al ${transfer.date}: ${money.format(available)}.`);
+    const movement = { date: transfer.date, kind: 'transfer' as const, amount, account: transfer.account, toAccount: transfer.toAccount, note: transfer.note.trim() };
+    setTransferSaving(true);
+    const saved = await runChange(() => saveMovementRequest(movement), transferMode === 'withdrawal' ? 'Retiro guardado' : 'Transferencia guardada');
+    setTransferSaving(false);
+    if (saved) setTransfer(null);
   };
 
   const removeMovement = (id: string) => {
@@ -260,6 +276,7 @@ export default function App({ themeMode, onThemeToggle, onLogout, onPasswordChan
 
   const startTransfer = () => {
     setTransferMode('transfer');
+    setTransferError('');
     setTransfer({ date: localDate(new Date()), amount: '', account: data.accounts[0]?.id ?? 'cash', toAccount: bankAccounts[0]?.id ?? 'bank', note: '' });
   };
 
@@ -269,6 +286,7 @@ export default function App({ themeMode, onThemeToggle, onLogout, onPasswordChan
       return;
     }
     setTransferMode('withdrawal');
+    setTransferError('');
     setTransfer({ date: localDate(new Date()), amount: '', account: bankAccounts[0].id, toAccount: data.accounts.find((account) => account.kind === 'cash')?.id ?? 'cash', note: '' });
   };
 
@@ -392,6 +410,16 @@ export default function App({ themeMode, onThemeToggle, onLogout, onPasswordChan
                 </tbody>
               </table>
             </div>
+            <div className="transfer-history" aria-label="Transferencias y retiros del mes">
+              <div className="transfer-history-heading"><h3>Transferencias y retiros</h3><span>{visibleTransfers.length} {visibleTransfers.length === 1 ? 'movimiento' : 'movimientos'}</span></div>
+              {visibleTransfers.length ? <div className="transfer-history-list">{[...visibleTransfers].sort((left, right) => right.date.localeCompare(left.date)).map((movement) => {
+                const source = data.accounts.find((account) => account.id === movement.account);
+                const target = data.accounts.find((account) => account.id === movement.toAccount);
+                const withdrawal = source?.kind === 'bank' && target?.kind === 'cash';
+                const dateLabel = new Intl.DateTimeFormat('es-EC', { day: 'numeric', month: 'short' }).format(new Date(`${movement.date}T12:00:00`));
+                return <article className="transfer-history-row" key={movement.id}><div className="transfer-history-copy"><strong>{withdrawal ? 'Retiro de efectivo' : 'Transferencia'} · {dateLabel}</strong><span>{source?.name ?? 'Cuenta'} → {target?.name ?? 'Cuenta'}{movement.note ? ` · ${movement.note}` : ''}</span></div><strong className="transfer-history-amount">{money.format(movement.amount)}</strong></article>;
+              })}</div> : <p className="transfer-history-empty">No hay transferencias ni retiros en este mes y cuenta.</p>}
+            </div>
             <footer className="sheet-footer"><span>Datos guardados en tu cuenta.</span><span><i className="account-dot cash" /> Efectivo <i className="account-dot bank" /> Débito</span></footer>
           </section>
           </> : section === 'budget' ? <BudgetPage data={data} month={month} onMonthChange={setMonth} />
@@ -433,15 +461,21 @@ export default function App({ themeMode, onThemeToggle, onLogout, onPasswordChan
 
       <CategoryManager open={categoryOpen !== null} initialKind={categoryOpen ?? 'expense'} initialCategory={categoryEditingTarget} categories={data.categories} onClose={() => { setCategoryOpen(null); setCategoryEditingTarget(null); }} onSave={saveCategories} />
 
-      <IonModal isOpen={!!transfer} onDidDismiss={() => setTransfer(null)} className="form-modal">
-        <div className="modal-shell"><div className="modal-heading"><div><span className="modal-kicker">{transferMode === 'withdrawal' ? 'BANCO A EFECTIVO' : 'ENTRE TUS CUENTAS'}</span><h2>{transferMode === 'withdrawal' ? 'Retirar efectivo' : 'Transferir dinero'}</h2></div><button className="icon-close" onClick={() => setTransfer(null)} aria-label="Cerrar"><IonIcon icon={closeOutline} /></button></div>
-          {transfer && <div className="form-fields"><p className="helper-copy">El traslado cambia los saldos, pero no cuenta como ingreso ni gasto.</p>
-            <IonItem className="form-item"><IonInput label="Monto" labelPlacement="stacked" type="number" min="0.01" step="0.01" placeholder="0,00" value={transfer.amount} onIonInput={(event) => setTransfer({ ...transfer, amount: String(event.detail.value ?? '') })} /></IonItem>
-            <IonItem className="form-item"><IonSelect label="Desde" labelPlacement="stacked" value={transfer.account} onIonChange={(event) => setTransfer({ ...transfer, account: event.detail.value })}>{(transferMode === 'withdrawal' ? bankAccounts : data.accounts).map((account) => <IonSelectOption key={account.id} value={account.id}>{account.name}</IonSelectOption>)}</IonSelect></IonItem>
-            {transferMode === 'withdrawal' ? <IonItem className="form-item"><IonInput label="Hacia" labelPlacement="stacked" readonly value="Efectivo" /></IonItem> : <IonItem className="form-item"><IonSelect label="Hacia" labelPlacement="stacked" value={transfer.toAccount} onIonChange={(event) => setTransfer({ ...transfer, toAccount: event.detail.value })}>{data.accounts.map((account) => <IonSelectOption key={account.id} value={account.id}>{account.name}</IonSelectOption>)}</IonSelect></IonItem>}
-            <IonItem className="form-item"><IonInput label="Fecha" labelPlacement="stacked" type="date" value={transfer.date} onIonInput={(event) => setTransfer({ ...transfer, date: String(event.detail.value ?? '') })} /></IonItem>
+      <IonModal isOpen={!!transfer} onDidDismiss={() => { setTransfer(null); setTransferError(''); }} className="form-modal">
+        <div className="modal-shell"><div className="modal-heading"><div><span className="modal-kicker">{transferMode === 'withdrawal' ? 'BANCO A EFECTIVO' : 'ENTRE TUS CUENTAS'}</span><h2>{transferMode === 'withdrawal' ? 'Retirar efectivo' : 'Transferir dinero'}</h2></div><button className="icon-close" onClick={() => setTransfer(null)} disabled={transferSaving} aria-label="Cerrar"><IonIcon icon={closeOutline} /></button></div>
+          {transfer && <div className="form-fields"><p className="helper-copy">Saldos disponibles al {transfer.date}. El traslado no cuenta como ingreso ni gasto.</p>
+            <IonItem className="form-item"><IonInput label="Monto" labelPlacement="stacked" type="number" min="0.01" step="0.01" placeholder="0,00" value={transfer.amount} onIonInput={(event) => { setTransfer({ ...transfer, amount: String(event.detail.value ?? '') }); setTransferError(''); }} /></IonItem>
+            <IonItem className="form-item"><IonSelect label="Desde" labelPlacement="stacked" value={transfer.account} onIonChange={(event) => {
+              const account = String(event.detail.value);
+              const toAccount = transferMode === 'withdrawal' || transfer.toAccount !== account ? transfer.toAccount : data.accounts.find((item) => item.id !== account)?.id ?? account;
+              setTransfer({ ...transfer, account, toAccount });
+              setTransferError('');
+            }}>{(transferMode === 'withdrawal' ? bankAccounts : data.accounts).map((account) => <IonSelectOption key={account.id} value={account.id}>{account.name} · {money.format(balanceAt(account.id, transfer.date))}</IonSelectOption>)}</IonSelect></IonItem>
+            {transferMode === 'withdrawal' ? <IonItem className="form-item"><IonInput label="Hacia" labelPlacement="stacked" readonly value={`Efectivo · ${money.format(balanceAt(transfer.toAccount, transfer.date))}`} /></IonItem> : <IonItem className="form-item"><IonSelect label="Hacia" labelPlacement="stacked" value={transfer.toAccount} onIonChange={(event) => { setTransfer({ ...transfer, toAccount: String(event.detail.value) }); setTransferError(''); }}>{data.accounts.filter((account) => account.id !== transfer.account).map((account) => <IonSelectOption key={account.id} value={account.id}>{account.name} · {money.format(balanceAt(account.id, transfer.date))}</IonSelectOption>)}</IonSelect></IonItem>}
+            <IonItem className="form-item"><IonInput label="Fecha" labelPlacement="stacked" type="date" value={transfer.date} onIonInput={(event) => { setTransfer({ ...transfer, date: String(event.detail.value ?? '') }); setTransferError(''); }} /></IonItem>
             <IonItem className="form-item"><IonInput label="Descripción (opcional)" labelPlacement="stacked" value={transfer.note} onIonInput={(event) => setTransfer({ ...transfer, note: String(event.detail.value ?? '') })} /></IonItem>
-            <div className="modal-actions"><IonButton fill="outline" onClick={() => setTransfer(null)}>Cancelar</IonButton><IonButton onClick={saveTransfer} disabled={transfer.account === transfer.toAccount}>{transferMode === 'withdrawal' ? 'Guardar retiro' : 'Guardar transferencia'}</IonButton></div>
+            {transferError && <div role="alert" className="login-error movement-validation">{transferError}</div>}
+            <div className="modal-actions"><IonButton fill="outline" disabled={transferSaving} onClick={() => setTransfer(null)}>Cancelar</IonButton><IonButton onClick={saveTransfer} disabled={transferSaving || transfer.account === transfer.toAccount}>{transferMode === 'withdrawal' ? 'Guardar retiro' : 'Guardar transferencia'}</IonButton></div>
           </div>}
         </div>
       </IonModal>

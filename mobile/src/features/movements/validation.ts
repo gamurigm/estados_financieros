@@ -29,11 +29,14 @@ export function validateMovement(input: MovementDraft): ValidationResult {
   return { ok: true };
 }
 
-export function validateTransfer(input: TransferDraft): ValidationResult {
+export function validateTransfer(input: TransferDraft, availableBalance?: number): ValidationResult {
   const shared = validateDateAndAmount(input.date, input.amount);
   if (!shared.ok) return shared;
   if (input.account === input.toAccount) {
     return { ok: false, field: 'toAccount', message: 'Elige cuentas distintas.' };
+  }
+  if (availableBalance !== undefined && Math.round(parseAmount(input.amount) * 100) > Math.round(availableBalance * 100)) {
+    return { ok: false, field: 'amount', message: `Saldo insuficiente. Disponible: ${availableBalance.toFixed(2)}.` };
   }
   return { ok: true };
 }

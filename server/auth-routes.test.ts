@@ -285,6 +285,50 @@ test('owner can create a bank account and use its id for debit movements', async
   }
 });
 
+test('owner can transfer available funds and cannot overdraw the source account', async () => {
+  const harness = await startHarness();
+  try {
+    const tokens = await loginAndroid(harness.baseUrl);
+    const headers = { authorization: `Bearer ${tokens.accessToken}` };
+    const date = new Date().toISOString().slice(0, 10);
+    const insufficient = await send(harness.baseUrl, '/api/movements', {
+      method: 'POST', headers,
+      body: { date, kind: 'transfer', amount: 1, account: 'bank', toAccount: 'cash', note: '' },
+    });
+    assert.equal(insufficient.status, 400);
+    assert.deepEqual(await insufficient.json(), { error: 'Saldo insuficiente. Disponible: 0.00.' });
+
+    const income = await send(harness.baseUrl, '/api/movements', {
+      method: 'POST', headers,
+      body: { date, kind: 'income', amount: 50, categoryId: 'income', toAccount: 'bank', note: '' },
+    });
+    assert.equal(income.status, 201);
+
+    const transfer = await send(harness.baseUrl, '/api/movements', {
+      method: 'POST', headers,
+      body: { date, kind: 'transfer', amount: 30, account: 'bank', toAccount: 'cash', note: '' },
+    });
+    assert.equal(transfer.status, 201);
+    assert.equal((await transfer.json() as Record<string, unknown>).toAccount, 'cash');
+
+    const cashOverdraw = await send(harness.baseUrl, '/api/movements', {
+      method: 'POST', headers,
+      body: { date, kind: 'transfer', amount: 31, account: 'cash', toAccount: 'bank', note: '' },
+    });
+    assert.equal(cashOverdraw.status, 400);
+    assert.deepEqual(await cashOverdraw.json(), { error: 'Saldo insuficiente. Disponible: 30.00.' });
+
+    const overdraw = await send(harness.baseUrl, '/api/movements', {
+      method: 'POST', headers,
+      body: { date, kind: 'transfer', amount: 21, account: 'bank', toAccount: 'cash', note: '' },
+    });
+    assert.equal(overdraw.status, 400);
+    assert.deepEqual(await overdraw.json(), { error: 'Saldo insuficiente. Disponible: 20.00.' });
+  } finally {
+    await harness.close();
+  }
+});
+
 test('password change requires an authenticated session', async () => {
   const harness = await startHarness();
   try {
@@ -429,12 +473,12 @@ async function startHarness() {
   const store = await createMemoryAuthStore();
   const databaseCalls: string[] = [];
   const budgets = new Map<string, number>();
+  const movements: Array<{ id: string; date: string; kind: string; amount: string; categoryId: string | null; account: string | null; toAccount: string | null; note: string }> = [];
   const accounts = [
     { account_key: 'cash', name: 'Efectivo', account_type: 'cash', opening_balance: '0', start_date: '1900-01-01' },
     { account_key: 'bank', name: 'Banco / débito', account_type: 'bank', opening_balance: '0', start_date: '1900-01-01' },
   ];
-  const pool = {
-    query: async (sql: string, values: unknown[] = []) => {
+  const query = async (sql: string, values: unknown[] = []) => {
       databaseCalls.push(sql);
       if (sql.includes('DELETE FROM monthly_budgets')) {
         budgets.delete(String(values[0]));
@@ -450,8 +494,22 @@ async function startHarness() {
         budgets.set(monthStart, amount);
         return { rows: [{ month: monthStart.slice(0, 7), amount: String(amount) }], rowCount: 1 };
       }
+      if (sql.includes('SELECT CASE WHEN $2::date < a.start_date THEN 0')) {
+        const [accountKey, date, excludedId] = values as [string, string, string | null];
+        const account = accounts.find((item) => item.account_key === accountKey);
+        if (!account) return { rows: [], rowCount: 0 };
+        const balance = date < account.start_date ? 0 : movements.reduce((total, movement) => {
+          if (movement.id === excludedId || movement.date < account.start_date || movement.date > date) return total;
+          if (movement.kind === 'income' && movement.toAccount === accountKey) return total + Number(movement.amount);
+          if (movement.kind === 'expense' && movement.account === accountKey) return total - Number(movement.amount);
+          if (movement.kind === 'transfer' && movement.account === accountKey) return total - Number(movement.amount);
+          if (movement.kind === 'transfer' && movement.toAccount === accountKey) return total + Number(movement.amount);
+          return total;
+        }, Number(account.opening_balance));
+        return { rows: [{ balance: String(balance) }], rowCount: 1 };
+      }
       if (sql.includes('FROM categories')) return { rows: [], rowCount: 0 };
-      if (sql.includes('FROM movements')) return { rows: [], rowCount: 0 };
+      if (sql.includes('FROM movements')) return { rows: movements, rowCount: movements.length };
       if (sql.includes('FROM accounts WHERE account_key')) {
         const requested = values[0] as string[];
         return { rows: accounts.filter((account) => requested.includes(account.account_key)), rowCount: requested.length };
@@ -481,13 +539,18 @@ async function startHarness() {
       }
       if (sql.includes('INSERT INTO movements')) {
         const [date, kind, amount, categoryId, account, toAccount, note] = values as [string, string, number, string | null, string | null, string | null, string];
+        const row = { id: `movement-${movements.length + 1}`, date, kind, amount: String(amount), categoryId, account, toAccount, note };
+        movements.push(row);
         return {
-          rows: [{ id: 'movement-id', date, kind, amount: String(amount), categoryId, account, toAccount, note }],
+          rows: [row],
           rowCount: 1,
         };
       }
       return { rows: [{ '?column?': 1 }], rowCount: 1 };
-    },
+  };
+  const pool = {
+    query,
+    connect: async () => ({ query, release: () => undefined }),
   } as unknown as Pool;
   const server = createServer(createApp(pool, store.authStore));
   server.listen(0, '127.0.0.1');

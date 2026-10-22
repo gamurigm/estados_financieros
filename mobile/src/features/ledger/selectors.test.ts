@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { getMonthlySummary } from './selectors.js';
+import { getAccountBalanceAsOf, getMonthlySummary } from './selectors.js';
 import type { AccountId, FinanceState, Movement } from '../../api/contracts.js';
 
 test('monthly summary includes first and last day and ignores adjacent months', () => {
@@ -95,6 +95,19 @@ test('debit balance sums every bank and ignores balances before an account start
   assert.equal(february.debitTotal, 95);
   assert.equal(february.income, 20);
   assert.equal(february.expenses, 0);
+});
+
+test('account balance uses movements through the selected date', () => {
+  const data = state([
+    movement({ id: 'deposit', date: '2026-02-10', kind: 'income', amount: 50, toAccount: 'bank' }),
+    movement({ id: 'withdrawal', date: '2026-02-15', kind: 'transfer', amount: 20, account: 'bank', toAccount: 'cash' }),
+  ], { cash: 10, bank: 30 });
+
+  assert.equal(getAccountBalanceAsOf(data, 'bank', '2026-02-09'), 30);
+  assert.equal(getAccountBalanceAsOf(data, 'bank', '2026-02-10'), 80);
+  assert.equal(getAccountBalanceAsOf(data, 'bank', '2026-02-15'), 60);
+  assert.equal(getAccountBalanceAsOf(data, 'cash', '2026-02-14'), 10);
+  assert.equal(getAccountBalanceAsOf(data, 'cash', '2026-02-15'), 30);
 });
 
 function state(movements: Movement[], opening: Record<AccountId, number> = { cash: 0, bank: 0 }): FinanceState {

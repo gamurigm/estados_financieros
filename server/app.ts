@@ -1,7 +1,7 @@
 import cookieParser from 'cookie-parser';
 import { randomUUID } from 'node:crypto';
 import express from 'express';
-import type { Pool } from 'pg';
+import type { Pool, PoolClient } from 'pg';
 import { createAuthRouter } from './auth.js';
 import type { AuthStore } from './auth-store.js';
 import { requireAuth } from './auth-middleware.js';
@@ -90,29 +90,18 @@ export function createApp(pool: Pool, authStore: AuthStore) {
   app.post('/api/movements', async (request, response, next) => {
     try {
       const row = normalizeMovement(request.body);
-      await ensureAccountsExist(pool, row);
-      const { rows } = await pool.query(
-        `INSERT INTO movements (movement_date, kind, amount, category_id, account_key, to_account_key, note)
-         VALUES ($1, $2, $3, $4, $5, $6, $7)
-         RETURNING id, to_char(movement_date, 'YYYY-MM-DD') AS date, kind, amount, category_id AS "categoryId", account_key AS account, to_account_key AS "toAccount", note`,
-        [row.date, row.kind, row.amount, row.categoryId, row.account, row.toAccount, row.note],
-      );
-      response.status(201).json({ ...rows[0], amount: Number(rows[0].amount) });
+      const saved = await saveMovement(pool, row);
+      if (!saved) throw new Error('No se pudo guardar el movimiento.');
+      response.status(201).json({ ...saved, amount: Number(saved.amount) });
     } catch (error) { next(error); }
   });
 
   app.put('/api/movements/:id', async (request, response, next) => {
     try {
       const row = normalizeMovement(request.body);
-      await ensureAccountsExist(pool, row);
-      const { rows } = await pool.query(
-        `UPDATE movements SET movement_date=$1, kind=$2, amount=$3, category_id=$4, account_key=$5, to_account_key=$6, note=$7
-         WHERE id=$8
-         RETURNING id, to_char(movement_date, 'YYYY-MM-DD') AS date, kind, amount, category_id AS "categoryId", account_key AS account, to_account_key AS "toAccount", note`,
-        [row.date, row.kind, row.amount, row.categoryId, row.account, row.toAccount, row.note, request.params.id],
-      );
-      if (!rows[0]) return response.status(404).json({ error: 'Movimiento no encontrado.' });
-      response.json({ ...rows[0], amount: Number(rows[0].amount) });
+      const saved = await saveMovement(pool, row, request.params.id);
+      if (!saved) return response.status(404).json({ error: 'Movimiento no encontrado.' });
+      response.json({ ...saved, amount: Number(saved.amount) });
     } catch (error) { next(error); }
   });
 
@@ -192,6 +181,60 @@ export function createApp(pool: Pool, authStore: AuthStore) {
   return app;
 }
 
+async function saveMovement(pool: Pool, movement: ReturnType<typeof normalizeMovement>, id?: string) {
+  const client = movement.kind === 'transfer' ? await pool.connect() : null;
+  const connection = client ?? pool;
+  try {
+    if (client) await client.query('BEGIN');
+    await ensureAccountsExist(connection, movement);
+    if (client) await assertTransferBalance(client, movement, id);
+    const { rows } = await connection.query(
+      id
+        ? `UPDATE movements SET movement_date=$1, kind=$2, amount=$3, category_id=$4, account_key=$5, to_account_key=$6, note=$7
+           WHERE id=$8
+           RETURNING id, to_char(movement_date, 'YYYY-MM-DD') AS date, kind, amount, category_id AS "categoryId", account_key AS account, to_account_key AS "toAccount", note`
+        : `INSERT INTO movements (movement_date, kind, amount, category_id, account_key, to_account_key, note)
+           VALUES ($1, $2, $3, $4, $5, $6, $7)
+           RETURNING id, to_char(movement_date, 'YYYY-MM-DD') AS date, kind, amount, category_id AS "categoryId", account_key AS account, to_account_key AS "toAccount", note`,
+      id
+        ? [movement.date, movement.kind, movement.amount, movement.categoryId, movement.account, movement.toAccount, movement.note, id]
+        : [movement.date, movement.kind, movement.amount, movement.categoryId, movement.account, movement.toAccount, movement.note],
+    );
+    if (client) await client.query('COMMIT');
+    return rows[0] as Record<string, unknown> | undefined;
+  } catch (error) {
+    if (client) await client.query('ROLLBACK').catch(() => undefined);
+    throw error;
+  } finally {
+    client?.release();
+  }
+}
+
+async function assertTransferBalance(client: PoolClient, movement: ReturnType<typeof normalizeMovement>, id?: string) {
+  await client.query('SELECT account_key FROM accounts WHERE account_key=$1 FOR UPDATE', [movement.account]);
+  const { rows } = await client.query(
+    `SELECT CASE WHEN $2::date < a.start_date THEN 0
+       ELSE a.opening_balance + COALESCE(SUM(CASE
+         WHEN m.kind='income' AND m.to_account_key=a.account_key THEN m.amount
+         WHEN m.kind='expense' AND m.account_key=a.account_key THEN -m.amount
+         WHEN m.kind='transfer' AND m.account_key=a.account_key THEN -m.amount
+         WHEN m.kind='transfer' AND m.to_account_key=a.account_key THEN m.amount
+         ELSE 0 END), 0)
+       END AS balance
+     FROM accounts a
+     LEFT JOIN movements m ON m.movement_date >= a.start_date AND m.movement_date <= $2::date
+       AND (m.account_key=a.account_key OR m.to_account_key=a.account_key)
+       AND ($3::text IS NULL OR m.id::text IS DISTINCT FROM $3::text)
+     WHERE a.account_key=$1
+     GROUP BY a.account_key, a.start_date, a.opening_balance`,
+    [movement.account, movement.date, id ?? null],
+  );
+  const balance = Number(rows[0]?.balance ?? 0);
+  if (Math.round(balance * 100) < Math.round(Number(movement.amount) * 100)) {
+    throw new Error(`Saldo insuficiente. Disponible: ${balance.toFixed(2)}.`);
+  }
+}
+
 function normalizeMovement(input: Record<string, unknown>) {
   const kind = input.kind;
   const amount = Number(input.amount);
@@ -200,7 +243,7 @@ function normalizeMovement(input: Record<string, unknown>) {
   const account = input.account ? String(input.account) : null;
   const toAccount = input.toAccount ? String(input.toAccount) : null;
   const note = String(input.note ?? '').trim();
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || !Number.isFinite(amount) || amount <= 0) throw new Error('Fecha o monto inválido.');
+  if (!isDateString(date) || !Number.isFinite(amount) || amount <= 0) throw new Error('Fecha o monto inválido.');
   if (!['income', 'expense', 'transfer'].includes(String(kind))) throw new Error('Tipo de movimiento inválido.');
   if (kind === 'income' && (!categoryId || account || !isAccountKey(toAccount))) throw new Error('Ingreso incompleto.');
   if (kind === 'expense' && (!categoryId || !isAccountKey(account) || toAccount)) throw new Error('Gasto incompleto.');
@@ -208,7 +251,7 @@ function normalizeMovement(input: Record<string, unknown>) {
   return { date, kind, amount, categoryId, account, toAccount, note };
 }
 
-async function ensureAccountsExist(pool: Pool, movement: ReturnType<typeof normalizeMovement>) {
+async function ensureAccountsExist(pool: Pool | PoolClient, movement: ReturnType<typeof normalizeMovement>) {
   const ids = [...new Set([movement.account, movement.toAccount].filter((id): id is string => id !== null))];
   const result = await pool.query('SELECT account_key FROM accounts WHERE account_key = ANY($1::text[])', [ids]);
   if (result.rows.length !== ids.length) throw new Error('Cuenta no encontrada.');

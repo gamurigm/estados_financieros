@@ -56,3 +56,12 @@ test('transfer validation rejects same account, invalid amount, and invalid date
 test('transfer validation accepts a valid draft', () => {
   assert.deepEqual(validateTransfer(validTransfer), { ok: true });
 });
+
+test('transfer validation blocks amounts above available balance', () => {
+  assert.deepEqual(validateTransfer(validTransfer, 12.49), {
+    ok: false,
+    field: 'amount',
+    message: 'Saldo insuficiente. Disponible: 12.49.',
+  });
+  assert.deepEqual(validateTransfer(validTransfer, 12.5), { ok: true });
+});

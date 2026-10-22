@@ -71,6 +71,17 @@ h1 { margin: 0; color: var(--navy); font-size: clamp(25px, 3vw, 34px); letter-sp
 .sheet-hint { display: flex; align-items: center; gap: 6px; color: #70808e; font-size: 10px; }
 .sheet-hint ion-icon { font-size: 14px; color: var(--blue); }
 .sheet-scroll { overflow: auto; max-height: min(66vh, 760px); border-top: 1px solid var(--line); scrollbar-color: #bdcbd5 #f5f7f9; scrollbar-width: thin; }
+.transfer-history { border-top: 1px solid var(--border); padding: 18px 21px; }
+.transfer-history-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 11px; }
+.transfer-history-heading h3 { margin: 0; color: var(--ink); font-size: 14px; }
+.transfer-history-heading > span, .transfer-history-empty { color: var(--muted); font-size: 11px; }
+.transfer-history-list { display: grid; gap: 7px; }
+.transfer-history-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 12px; border: 1px solid var(--border); border-radius: 12px; background: var(--surface-elevated); }
+.transfer-history-copy { display: grid; min-width: 0; gap: 4px; }
+.transfer-history-copy strong { color: var(--ink); font-size: 12px; }
+.transfer-history-copy span { overflow-wrap: anywhere; color: var(--muted); font-size: 11px; }
+.transfer-history-amount { color: var(--ink); font-size: 13px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.transfer-history-empty { margin: 0; }
 .ledger { border-collapse: separate; border-spacing: 0; min-width: 100%; width: max-content; table-layout: fixed; font-size: 11px; }
 .ledger th, .ledger td { border-right: 1px solid #e8edf1; border-bottom: 1px solid #e8edf1; }
 .ledger thead th { position: sticky; top: 0; z-index: 3; height: 50px; background: #edf3f5; color: #536b79; font-weight: 650; text-align: center; }
