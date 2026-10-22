@@ -9,6 +9,18 @@ export type MonthlySummary = {
   movements: Movement[];
 };
 
+export type DailyTotals = { income: number; expenses: number; transfers: number };
+
+export function getDailyTotals(movements: readonly Movement[]): Record<string, DailyTotals> {
+  return movements.reduce<Record<string, DailyTotals>>((totals, movement) => {
+    const day = totals[movement.date] ??= { income: 0, expenses: 0, transfers: 0 };
+    if (movement.kind === 'income') day.income += movement.amount;
+    else if (movement.kind === 'expense') day.expenses += movement.amount;
+    else day.transfers += 1;
+    return totals;
+  }, {});
+}
+
 export function getMonthlySummary(
   state: FinanceState,
   month: string,

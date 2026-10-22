@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { getAccountBalanceAsOf, getMonthlySummary } from './selectors.js';
+import { getAccountBalanceAsOf, getDailyTotals, getMonthlySummary } from './selectors.js';
 import type { AccountId, FinanceState, Movement } from '../../api/contracts.js';
 
 test('monthly summary includes first and last day and ignores adjacent months', () => {
@@ -69,6 +69,20 @@ test('transfers change account balances but not income or expense totals', () =>
   assert.equal(summary.expenses, 0);
   assert.equal(summary.net, 100);
   assert.deepEqual(summary.balances, { cash: 65, bank: 50 });
+});
+
+test('daily totals group income and expenses and leave transfers out', () => {
+  const totals = getDailyTotals([
+    movement({ id: 'income', date: '2026-02-05', kind: 'income', amount: 100, toAccount: 'cash' }),
+    movement({ id: 'expense', date: '2026-02-05', kind: 'expense', amount: 12.5, account: 'cash' }),
+    movement({ id: 'transfer', date: '2026-02-05', kind: 'transfer', amount: 20, account: 'cash', toAccount: 'bank' }),
+    movement({ id: 'next-day', date: '2026-02-06', kind: 'expense', amount: 4, account: 'cash' }),
+  ]);
+
+  assert.deepEqual(totals, {
+    '2026-02-05': { income: 100, expenses: 12.5, transfers: 1 },
+    '2026-02-06': { income: 0, expenses: 4, transfers: 0 },
+  });
 });
 
 test('debit balance sums every bank and ignores balances before an account start date', () => {

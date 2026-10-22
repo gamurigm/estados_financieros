@@ -9,12 +9,13 @@ type Props = {
   categories: Category[];
   accounts: Account[];
   header: ReactElement;
+  emptyText?: string;
   refreshing: boolean;
   onRefresh: () => void;
   onEditMovement: (movement: Movement) => void;
 };
 
-export function MovementList({ movements, categories, accounts, header, refreshing, onRefresh, onEditMovement }: Props) {
+export function MovementList({ movements, categories, accounts, header, emptyText = 'Registra un ingreso o gasto, o elige otra cuenta o mes.', refreshing, onRefresh, onEditMovement }: Props) {
   const { styles } = useStyles();
   const recentFirst = [...movements].sort((left, right) => right.date.localeCompare(left.date) || right.id.localeCompare(left.id));
   return (
@@ -22,7 +23,7 @@ export function MovementList({ movements, categories, accounts, header, refreshi
       contentContainerStyle={styles.content}
       data={recentFirst}
       keyExtractor={(item) => item.id}
-      ListEmptyComponent={<View style={styles.empty}><Text style={styles.emptyTitle}>Sin movimientos en esta selección</Text><Text style={styles.emptyText}>Registra un ingreso o gasto, o elige otra cuenta o mes.</Text></View>}
+      ListEmptyComponent={<View style={styles.empty}><Text style={styles.emptyTitle}>Sin movimientos en esta selección</Text><Text style={styles.emptyText}>{emptyText}</Text></View>}
       ListHeaderComponent={header}
       onRefresh={onRefresh}
       refreshing={refreshing}

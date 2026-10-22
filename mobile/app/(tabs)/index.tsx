@@ -6,6 +6,7 @@ import { apiRequest } from '../../src/api/client';
 import type { AccountId, FinanceState } from '../../src/api/contracts';
 import { sessionManager } from '../../src/auth/session';
 import { MovementList } from '../../src/features/ledger/MovementList';
+import { CalendarView } from '../../src/features/ledger/CalendarView';
 import { getMonthlySummary } from '../../src/features/ledger/selectors';
 import { getCurrentMonth } from '../../src/features/ledger/months';
 import { MonthNavigator } from '../../src/features/ledger/MonthNavigator';
@@ -13,11 +14,14 @@ import { DrawerMenuButton } from '../../src/navigation/FinanceDrawer';
 import { Button, createThemedStyles, GlassPanel, ThemeToggle } from '../../src/ui';
 
 const currency = new Intl.NumberFormat('es-EC', { style: 'currency', currency: 'USD' });
+const selectedDateLabel = new Intl.DateTimeFormat('es-EC', { day: 'numeric', month: 'long', year: 'numeric' });
 export default function MonthlyLedgerScreen() {
   const { colors, ui, styles } = useStyles();
   const [data, setData] = useState<FinanceState | null>(null);
   const [month, setMonth] = useState(getCurrentMonth());
   const [filter, setFilter] = useState<'all' | AccountId>('all');
+  const [view, setView] = useState<'book' | 'calendar'>('book');
+  const [selectedDate, setSelectedDate] = useState<string | null>(() => getToday());
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState('');
@@ -42,6 +46,10 @@ export default function MonthlyLedgerScreen() {
   }, [load]));
 
   const summary = useMemo(() => data ? getMonthlySummary(data, month, filter) : null, [data, month, filter]);
+  const selectedMovements = useMemo(
+    () => summary?.movements.filter((movement) => movement.date === selectedDate) ?? [],
+    [summary, selectedDate],
+  );
 
   async function logout() {
     try {
@@ -58,7 +66,7 @@ export default function MonthlyLedgerScreen() {
       <View style={styles.topRow}>
         <View style={styles.topCopy}>
           <Text style={styles.welcome}>Tus finanzas, a la vista</Text>
-          <Text accessibilityRole="header" style={styles.heading}>Mi libro</Text>
+          <Text accessibilityRole="header" style={styles.heading}>{view === 'calendar' ? 'Mi calendario' : 'Mi libro'}</Text>
         </View>
         <View style={styles.headerActions}>
           <DrawerMenuButton />
@@ -67,7 +75,23 @@ export default function MonthlyLedgerScreen() {
         </View>
       </View>
 
-      <MonthNavigator month={month} onChange={setMonth} />
+      <MonthNavigator month={month} onChange={(nextMonth) => { setMonth(nextMonth); setSelectedDate(null); }} />
+      <View accessibilityLabel="Cambiar vista" style={[ui.segmented, styles.viewModes]}>
+        {[{ id: 'book', label: 'Libro' }, { id: 'calendar', label: 'Calendario' }].map((option) => {
+          const active = view === option.id;
+          return (
+            <Pressable
+              accessibilityRole="button"
+              accessibilityState={{ selected: active }}
+              key={option.id}
+              onPress={() => setView(option.id as 'book' | 'calendar')}
+              style={({ pressed }) => [ui.segment, active && ui.segmentActive, pressed && ui.pressed]}
+            >
+              <Text style={[ui.segmentText, active && ui.segmentTextActive]}>{option.label}</Text>
+            </Pressable>
+          );
+        })}
+      </View>
       <View style={[ui.segmented, styles.filters]}>
         {[{ id: 'all', label: 'Todas' }, ...(data?.accounts ?? []).map((account) => ({ id: account.id, label: account.name }))].map((option) => {
           const active = filter === option.id;
@@ -86,6 +110,10 @@ export default function MonthlyLedgerScreen() {
           );
         })}
       </View>
+
+      {view === 'calendar' && summary ? (
+        <CalendarView month={month} movements={summary.movements} selectedDate={selectedDate} onSelectDate={setSelectedDate} />
+      ) : null}
 
       {summary ? (
         <>
@@ -126,8 +154,12 @@ export default function MonthlyLedgerScreen() {
       ) : null}
 
       <View style={styles.sectionHeading}>
-        <Text accessibilityRole="header" style={styles.sectionTitle}>Movimientos</Text>
-        <View style={styles.countBadge}><Text style={styles.countText}>{summary?.movements.length ?? 0}</Text></View>
+        <Text accessibilityRole="header" style={styles.sectionTitle}>
+          {view === 'calendar'
+            ? selectedDate ? `Movimientos · ${selectedDateLabel.format(new Date(`${selectedDate}T12:00:00`))}` : 'Toca un día para ver movimientos'
+            : 'Movimientos'}
+        </Text>
+        <View style={styles.countBadge}><Text style={styles.countText}>{view === 'calendar' ? selectedMovements.length : summary?.movements.length ?? 0}</Text></View>
         {refreshing ? <ActivityIndicator color={colors.primary} size="small" /> : null}
       </View>
       {error ? <Text accessibilityRole="alert" accessibilityLiveRegion="polite" style={ui.error}>{error}</Text> : null}
@@ -155,14 +187,22 @@ export default function MonthlyLedgerScreen() {
       <MovementList
         accounts={data.accounts}
         categories={data.categories}
+        emptyText={view === 'calendar'
+          ? selectedDate ? 'No hay movimientos en esta fecha.' : 'Selecciona una fecha del calendario.'
+          : undefined}
         header={header}
-        movements={summary?.movements ?? []}
+        movements={view === 'calendar' ? selectedMovements : summary?.movements ?? []}
         onEditMovement={(movement) => router.push({ pathname: '/movements/[id]', params: { id: movement.id } })}
         onRefresh={() => { void load(true); }}
         refreshing={refreshing}
       />
     </SafeAreaView>
   );
+}
+
+function getToday() {
+  const today = new Date();
+  return `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
 }
 
 function Metric({ label, amount, symbol }: { label: string; amount: number; symbol: string }) {
@@ -202,6 +242,7 @@ const useStyles = createThemedStyles(({ colors, ui }) => StyleSheet.create({
   heading: { color: colors.ink, fontSize: 30, fontWeight: '800', letterSpacing: -1, marginTop: 3 },
   logout: { minHeight: 48, paddingVertical: 10 },
   filters: { marginTop: 8, marginBottom: 12, flexWrap: 'wrap' },
+  viewModes: { marginTop: 10, marginBottom: 4 },
   netCard: { backgroundColor: colors.hero, borderColor: colors.heroBorder, borderRadius: 24, padding: 18 },
   heroHeading: { alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between' },
   netLabel: { color: colors.heroText, fontSize: 14, fontWeight: '600' },
