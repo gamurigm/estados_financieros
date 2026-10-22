@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import {
   IonApp,
   IonButton,
@@ -53,7 +53,8 @@ const accountName = (id: AccountId | undefined, accounts: Account[]) => accounts
 
 type MovementDraft = { id?: string; date: string; kind: 'income' | 'expense'; amount: string; categoryId: string; account: AccountId; note: string };
 type TransferDraft = { date: string; amount: string; account: AccountId; toAccount: AccountId; note: string };
-type CellSelection = { date: string; category: Category };
+type CellAddAction = { label: string; draft: MovementDraft };
+type CellSelection = { title: string; context: string; movements: Data['movements']; addActions: CellAddAction[] };
 
 export default function App({ themeMode, onThemeToggle, onLogout, onPasswordChanged }: { themeMode: WebThemeMode; onThemeToggle: () => void; onLogout: () => void; onPasswordChanged: () => void }) {
   const [data, setData] = useState<Data>({ categories: [], movements: [], accounts: [], opening: { cash: 0, bank: 0 } });
@@ -80,6 +81,7 @@ export default function App({ themeMode, onThemeToggle, onLogout, onPasswordChan
   const [passwordError, setPasswordError] = useState('');
   const [passwordSaving, setPasswordSaving] = useState(false);
   const [cell, setCell] = useState<CellSelection | null>(null);
+  const [categoryEditingTarget, setCategoryEditingTarget] = useState<Category | null>(null);
   const [toast, setToast] = useState('');
 
   const updateDraft = (next: MovementDraft | null) => {
@@ -158,11 +160,27 @@ export default function App({ themeMode, onThemeToggle, onLogout, onPasswordChan
     updateDraft({ id: movement.id, date: movement.date, kind: movement.kind as 'income' | 'expense', amount: String(movement.amount), categoryId: movement.categoryId ?? '', account: (movement.kind === 'income' ? movement.toAccount : movement.account) ?? 'cash', note: movement.note });
   };
 
+  const defaultDateInSelectedMonth = () => {
+    const today = localDate(new Date());
+    return today.startsWith(`${month}-`) ? today : dateForMonth(month, 1);
+  };
+
+  const openAmountCell = (title: string, context: string, movements: Data['movements'], addActions: CellAddAction[]) => {
+    if (movements.length === 1) return openMovement(movements[0]);
+    if (!movements.length && addActions.length === 1) {
+      setCell(null);
+      updateDraft(addActions[0].draft);
+      return;
+    }
+    setCell({ title, context, movements, addActions });
+  };
+
   const openCell = (date: string, category: Category) => {
     const movements = movementsForCell(category.id, date);
-    if (movements.length === 1) return openMovement(movements[0]);
-    if (movements.length > 1) return setCell({ date, category });
-    updateDraft(makeDraft(category.kind, date, category.id));
+    const kindLabel = category.kind === 'income' ? 'ingreso' : 'gasto';
+    openAmountCell(`${category.name} · ${date}`, `${category.name} · ${date}`, movements, [
+      { label: `Agregar ${kindLabel}`, draft: makeDraft(category.kind, date, category.id) },
+    ]);
   };
 
   const saveMovement = async () => {
@@ -261,8 +279,6 @@ export default function App({ themeMode, onThemeToggle, onLogout, onPasswordChan
     setMonth(localDate(date).slice(0, 7));
   };
 
-  const categoryMovements = cell ? visibleMovements.filter((movement) => movement.date === cell.date && movement.categoryId === cell.category.id) : [];
-
   return (
     <IonApp>
       <IonContent fullscreen>
@@ -274,7 +290,7 @@ export default function App({ themeMode, onThemeToggle, onLogout, onPasswordChan
             <div className="top-actions">
               <ThemeToggle mode={themeMode} onToggle={onThemeToggle} />
               <IonButton fill="outline" className="quiet-button" onClick={() => { setAccountDrafts(Object.fromEntries(data.accounts.map((account) => [account.id, { name: account.name, balance: String(account.openingBalance) }]))); setBalanceOpen(true); }}><IonIcon slot="start" icon={walletOutline} /><span className="action-label">Cuentas y saldos</span></IonButton>
-              <IonButton fill="outline" className="quiet-button" onClick={() => setCategoryOpen('expense')}><IonIcon slot="start" icon={createOutline} /><span className="action-label">Rubros</span></IonButton>
+              <IonButton fill="outline" className="quiet-button" onClick={() => { setCategoryEditingTarget(null); setCategoryOpen('expense'); }}><IonIcon slot="start" icon={createOutline} /><span className="action-label">Rubros</span></IonButton>
               <IonButton fill="outline" className="quiet-button" onClick={startTransfer} disabled={!bankAccounts.length}><IonIcon slot="start" icon={swapHorizontalOutline} /><span className="action-label">Transferir</span></IonButton>
               <IonButton fill="outline" className="quiet-button" onClick={startWithdrawal} disabled={!bankAccounts.length}><IonIcon slot="start" icon={cashOutline} /><span className="action-label">Retirar</span></IonButton>
               <IonButton className="add-button" onClick={() => updateDraft(makeDraft('expense'))}><IonIcon slot="start" icon={addOutline} /><span className="action-label">Registrar</span></IonButton>
@@ -327,13 +343,53 @@ export default function App({ themeMode, onThemeToggle, onLogout, onPasswordChan
                   <tr><th className="category-column">Rubro</th>{Array.from({ length: days }, (_, index) => { const date = dateForMonth(month, index + 1); return <th key={date} className={`day-heading ${isWeekend(date) ? 'weekend-heading' : ''}`}><span>{new Intl.DateTimeFormat('es-EC', { weekday: 'short' }).format(new Date(`${date}T12:00:00`)).replace('.', '')}</span><strong>{index + 1}</strong></th>; })}<th className="total-heading">Total</th></tr>
                 </thead>
                 <tbody>
-                  <tr className="section-row income-section"><th colSpan={days + 2}>Ingresos <span>· {money.format(incomeTotal)}</span><button onClick={() => setCategoryOpen('income')} aria-label="Agregar rubro de ingreso"><IonIcon icon={addOutline} /></button></th></tr>
-                  {activeCategories.filter((category) => category.kind === 'income').map((category) => <tr className="category-row income-row" key={category.id}><th className="category-column"><span>{category.name}</span><small>Ingreso</small></th>{Array.from({ length: days }, (_, index) => { const date = dateForMonth(month, index + 1); const amount = totalForCell(category.id, date); return <td key={date} className={isWeekend(date) ? 'weekend-cell' : undefined}><button className={`cell-value ${amount ? 'has-value' : ''}`} onClick={() => openCell(date, category)} title={amount ? 'Clic para editar' : 'Clic para registrar'} aria-label={`${amount ? 'Editar' : 'Registrar'} ${category.name}, día ${index + 1}, ${money.format(amount)}`}>{amount ? money.format(amount) : <span className="empty-cell">·</span>}</button></td>; })}<td className="row-total">{money.format(Array.from({ length: days }, (_, index) => totalForCell(category.id, dateForMonth(month, index + 1))).reduce((sum, amount) => sum + amount, 0))}</td></tr>)}
-                  <tr className="daily-total income-daily"><th className="category-column">Total ingresos</th>{Array.from({ length: days }, (_, index) => { const date = dateForMonth(month, index + 1); return <td key={date} className={isWeekend(date) ? 'weekend-cell' : undefined}>{money.format(visibleMovements.filter((movement) => movement.kind === 'income' && movement.date === date).reduce((sum, movement) => sum + movement.amount, 0))}</td>; })}<td className="row-total">{money.format(incomeTotal)}</td></tr>
-                  <tr className="section-row expense-section"><th colSpan={days + 2}>Gastos <span>· {money.format(expenseTotal)}</span><button onClick={() => setCategoryOpen('expense')} aria-label="Agregar rubro de gasto"><IonIcon icon={addOutline} /></button></th></tr>
-                  {activeCategories.filter((category) => category.kind === 'expense').map((category) => <tr className="category-row expense-row" key={category.id}><th className="category-column"><span>{category.name}</span><small>Gasto</small></th>{Array.from({ length: days }, (_, index) => { const date = dateForMonth(month, index + 1); const amount = totalForCell(category.id, date); return <td key={date} className={isWeekend(date) ? 'weekend-cell' : undefined}><button className={`cell-value ${amount ? 'has-value' : ''}`} onClick={() => openCell(date, category)} title={amount ? 'Clic para editar' : 'Clic para registrar'} aria-label={`${amount ? 'Editar' : 'Registrar'} ${category.name}, día ${index + 1}, ${money.format(amount)}`}>{amount ? money.format(amount) : <span className="empty-cell">·</span>}</button></td>; })}<td className="row-total">{money.format(Array.from({ length: days }, (_, index) => totalForCell(category.id, dateForMonth(month, index + 1))).reduce((sum, amount) => sum + amount, 0))}</td></tr>)}
-                  <tr className="daily-total expense-daily"><th className="category-column">Total gastos</th>{Array.from({ length: days }, (_, index) => { const date = dateForMonth(month, index + 1); return <td key={date} className={isWeekend(date) ? 'weekend-cell' : undefined}>{money.format(visibleMovements.filter((movement) => movement.kind === 'expense' && movement.date === date).reduce((sum, movement) => sum + movement.amount, 0))}</td>; })}<td className="row-total">{money.format(expenseTotal)}</td></tr>
-                  <tr className="net-daily"><th className="category-column">Balance diario</th>{Array.from({ length: days }, (_, index) => { const date = dateForMonth(month, index + 1); const total = visibleMovements.filter((movement) => movement.date === date); return <td key={date} className={isWeekend(date) ? 'weekend-cell' : undefined}>{money.format(total.filter((movement) => movement.kind === 'income').reduce((sum, movement) => sum + movement.amount, 0) - total.filter((movement) => movement.kind === 'expense').reduce((sum, movement) => sum + movement.amount, 0))}</td>; })}<td className="row-total">{money.format(incomeTotal - expenseTotal)}</td></tr>
+                  <tr className="section-row income-section"><th colSpan={days + 2}>Ingresos <span>· {money.format(incomeTotal)}</span><button onClick={() => { setCategoryEditingTarget(null); setCategoryOpen('income'); }} aria-label="Agregar rubro de ingreso"><IonIcon icon={addOutline} /></button></th></tr>
+                  {activeCategories.filter((category) => category.kind === 'income').map((category) => {
+                    const categoryMovements = visibleMovements.filter((movement) => movement.categoryId === category.id);
+                    const kindLabel = category.kind === 'income' ? 'ingreso' : 'gasto';
+                    const categoryTotal = categoryMovements.reduce((sum, movement) => sum + movement.amount, 0);
+                    return <tr className="category-row income-row" key={category.id}>
+                      <th className="category-column"><button type="button" className="category-name-cell" onClick={() => { setCategoryEditingTarget(category); setCategoryOpen(category.kind); }} aria-label={`Editar rubro ${category.name}`} title="Clic para editar el rubro"><span>{category.name}</span><small>Ingreso</small></button></th>
+                      {Array.from({ length: days }, (_, index) => {
+                        const date = dateForMonth(month, index + 1);
+                        const amount = totalForCell(category.id, date);
+                        return <LedgerActionCell key={date} cellClassName={isWeekend(date) ? 'weekend-cell' : undefined} buttonClassName={amount ? 'has-value' : ''} label={`${amount ? 'Editar' : 'Registrar'} ${category.name}, día ${index + 1}, ${money.format(amount)}`} title={amount ? 'Clic para editar' : 'Clic para registrar'} onClick={() => openCell(date, category)} value={amount ? money.format(amount) : <span className="empty-cell">·</span>} />;
+                      })}
+                      <LedgerActionCell cellClassName="row-total" label={`Editar total de ${category.name}, ${money.format(categoryTotal)}`} title="Clic para revisar o editar los movimientos" onClick={() => openAmountCell(`Total de ${category.name}`, monthLabel(month), categoryMovements, [{ label: `Agregar ${kindLabel}`, draft: makeDraft(category.kind, defaultDateInSelectedMonth(), category.id) }])} value={money.format(categoryTotal)} />
+                    </tr>;
+                  })}
+                  <tr className="daily-total income-daily"><th className="category-column">Total ingresos</th>{Array.from({ length: days }, (_, index) => {
+                    const date = dateForMonth(month, index + 1);
+                    const movements = visibleMovements.filter((movement) => movement.kind === 'income' && movement.date === date);
+                    const amount = movements.reduce((sum, movement) => sum + movement.amount, 0);
+                    return <LedgerActionCell key={date} cellClassName={isWeekend(date) ? 'weekend-cell' : undefined} label={`Revisar total de ingresos, día ${index + 1}, ${money.format(amount)}`} onClick={() => openAmountCell(`Total de ingresos · ${date}`, monthLabel(month), movements, [{ label: 'Registrar ingreso', draft: makeDraft('income', date) }])} value={money.format(amount)} />;
+                  })}<LedgerActionCell cellClassName="row-total" label={`Revisar total de ingresos del mes, ${money.format(incomeTotal)}`} onClick={() => openAmountCell('Total de ingresos del mes', monthLabel(month), visibleMovements.filter((movement) => movement.kind === 'income'), [{ label: 'Registrar ingreso', draft: makeDraft('income', defaultDateInSelectedMonth()) }])} value={money.format(incomeTotal)} /></tr>
+                  <tr className="section-row expense-section"><th colSpan={days + 2}>Gastos <span>· {money.format(expenseTotal)}</span><button onClick={() => { setCategoryEditingTarget(null); setCategoryOpen('expense'); }} aria-label="Agregar rubro de gasto"><IonIcon icon={addOutline} /></button></th></tr>
+                  {activeCategories.filter((category) => category.kind === 'expense').map((category) => {
+                    const categoryMovements = visibleMovements.filter((movement) => movement.categoryId === category.id);
+                    const categoryTotal = categoryMovements.reduce((sum, movement) => sum + movement.amount, 0);
+                    return <tr className="category-row expense-row" key={category.id}>
+                      <th className="category-column"><button type="button" className="category-name-cell" onClick={() => { setCategoryEditingTarget(category); setCategoryOpen(category.kind); }} aria-label={`Editar rubro ${category.name}`} title="Clic para editar el rubro"><span>{category.name}</span><small>Gasto</small></button></th>
+                      {Array.from({ length: days }, (_, index) => {
+                        const date = dateForMonth(month, index + 1);
+                        const amount = totalForCell(category.id, date);
+                        return <LedgerActionCell key={date} cellClassName={isWeekend(date) ? 'weekend-cell' : undefined} buttonClassName={amount ? 'has-value' : ''} label={`${amount ? 'Editar' : 'Registrar'} ${category.name}, día ${index + 1}, ${money.format(amount)}`} title={amount ? 'Clic para editar' : 'Clic para registrar'} onClick={() => openCell(date, category)} value={amount ? money.format(amount) : <span className="empty-cell">·</span>} />;
+                      })}
+                      <LedgerActionCell cellClassName="row-total" label={`Editar total de ${category.name}, ${money.format(categoryTotal)}`} title="Clic para revisar o editar los movimientos" onClick={() => openAmountCell(`Total de ${category.name}`, monthLabel(month), categoryMovements, [{ label: 'Agregar gasto', draft: makeDraft(category.kind, defaultDateInSelectedMonth(), category.id) }])} value={money.format(categoryTotal)} />
+                    </tr>;
+                  })}
+                  <tr className="daily-total expense-daily"><th className="category-column">Total gastos</th>{Array.from({ length: days }, (_, index) => {
+                    const date = dateForMonth(month, index + 1);
+                    const movements = visibleMovements.filter((movement) => movement.kind === 'expense' && movement.date === date);
+                    const amount = movements.reduce((sum, movement) => sum + movement.amount, 0);
+                    return <LedgerActionCell key={date} cellClassName={isWeekend(date) ? 'weekend-cell' : undefined} label={`Revisar total de gastos, día ${index + 1}, ${money.format(amount)}`} onClick={() => openAmountCell(`Total de gastos · ${date}`, monthLabel(month), movements, [{ label: 'Registrar gasto', draft: makeDraft('expense', date) }])} value={money.format(amount)} />;
+                  })}<LedgerActionCell cellClassName="row-total" label={`Revisar total de gastos del mes, ${money.format(expenseTotal)}`} onClick={() => openAmountCell('Total de gastos del mes', monthLabel(month), visibleMovements.filter((movement) => movement.kind === 'expense'), [{ label: 'Registrar gasto', draft: makeDraft('expense', defaultDateInSelectedMonth()) }])} value={money.format(expenseTotal)} /></tr>
+                  <tr className="net-daily"><th className="category-column">Balance diario</th>{Array.from({ length: days }, (_, index) => {
+                    const date = dateForMonth(month, index + 1);
+                    const movements = visibleMovements.filter((movement) => movement.date === date && (movement.kind === 'income' || movement.kind === 'expense'));
+                    const amount = movements.filter((movement) => movement.kind === 'income').reduce((sum, movement) => sum + movement.amount, 0) - movements.filter((movement) => movement.kind === 'expense').reduce((sum, movement) => sum + movement.amount, 0);
+                    return <LedgerActionCell key={date} cellClassName={isWeekend(date) ? 'weekend-cell' : undefined} label={`Revisar balance del día ${index + 1}, ${money.format(amount)}`} onClick={() => openAmountCell(`Balance diario · ${date}`, monthLabel(month), movements, [{ label: 'Registrar ingreso', draft: makeDraft('income', date) }, { label: 'Registrar gasto', draft: makeDraft('expense', date) }])} value={money.format(amount)} />;
+                  })}<LedgerActionCell cellClassName="row-total" label={`Revisar balance del mes, ${money.format(incomeTotal - expenseTotal)}`} onClick={() => openAmountCell('Balance del mes', monthLabel(month), visibleMovements.filter((movement) => movement.kind === 'income' || movement.kind === 'expense'), [{ label: 'Registrar ingreso', draft: makeDraft('income', defaultDateInSelectedMonth()) }, { label: 'Registrar gasto', draft: makeDraft('expense', defaultDateInSelectedMonth()) }])} value={money.format(incomeTotal - expenseTotal)} /></tr>
                 </tbody>
               </table>
             </div>
@@ -365,15 +421,18 @@ export default function App({ themeMode, onThemeToggle, onLogout, onPasswordChan
 
       <IonModal isOpen={!!cell} onDidDismiss={() => setCell(null)} className="form-modal">
         <div className="modal-shell cell-modal">
-          <div className="modal-heading"><div><span className="modal-kicker">{cell?.category.kind === 'income' ? 'INGRESOS' : 'GASTOS'} · {cell?.date}</span><h2>{cell?.category.name}</h2></div><button className="icon-close" onClick={() => setCell(null)} aria-label="Cerrar"><IonIcon icon={closeOutline} /></button></div>
+          <div className="modal-heading"><div><span className="modal-kicker">MOVIMIENTOS · {cell?.context}</span><h2>{cell?.title}</h2></div><button className="icon-close" onClick={() => setCell(null)} aria-label="Cerrar"><IonIcon icon={closeOutline} /></button></div>
           {cell && <>
-            <div className="cell-movements">{categoryMovements.length ? categoryMovements.map((movement) => <article className="movement-line" key={movement.id}><div><strong>{money.format(movement.amount)}</strong><span>{accountName(movement.kind === 'income' ? movement.toAccount : movement.account, data.accounts)}{movement.note ? ` · ${movement.note}` : ''}</span></div><button aria-label="Editar movimiento" onClick={() => openMovement(movement)}><IonIcon icon={createOutline} /></button><button aria-label="Eliminar movimiento" onClick={() => removeMovement(movement.id)}><IonIcon icon={closeOutline} /></button></article>) : <p className="empty-state">No hay movimientos para este rubro y día.</p>}</div>
-            <IonButton expand="block" onClick={() => { const next = makeDraft(cell.category.kind, cell.date, cell.category.id); setCell(null); updateDraft(next); }}><IonIcon slot="start" icon={addOutline} /> Agregar movimiento</IonButton>
+            <div className="cell-movements">{cell.movements.length ? cell.movements.map((movement) => {
+              const categoryName = data.categories.find((category) => category.id === movement.categoryId)?.name ?? 'Sin rubro';
+              return <article className="movement-line" key={movement.id}><div><strong>{money.format(movement.amount)}</strong><span>{movement.date} · {categoryName} · {accountName(movement.kind === 'income' ? movement.toAccount : movement.account, data.accounts)}{movement.note ? ` · ${movement.note}` : ''}</span></div><button aria-label={`Editar movimiento del ${movement.date}`} onClick={() => openMovement(movement)}><IonIcon icon={createOutline} /></button><button aria-label={`Eliminar movimiento del ${movement.date}`} onClick={() => removeMovement(movement.id)}><IonIcon icon={closeOutline} /></button></article>;
+            }) : <p className="empty-state">No hay movimientos en esta celda todavía.</p>}</div>
+            {cell.addActions.map((action) => <IonButton key={action.label} expand="block" onClick={() => { setCell(null); updateDraft(action.draft); }}><IonIcon slot="start" icon={addOutline} /> {action.label}</IonButton>)}
           </>}
         </div>
       </IonModal>
 
-      <CategoryManager open={categoryOpen !== null} initialKind={categoryOpen ?? 'expense'} categories={data.categories} onClose={() => setCategoryOpen(null)} onSave={saveCategories} />
+      <CategoryManager open={categoryOpen !== null} initialKind={categoryOpen ?? 'expense'} initialCategory={categoryEditingTarget} categories={data.categories} onClose={() => { setCategoryOpen(null); setCategoryEditingTarget(null); }} onSave={saveCategories} />
 
       <IonModal isOpen={!!transfer} onDidDismiss={() => setTransfer(null)} className="form-modal">
         <div className="modal-shell"><div className="modal-heading"><div><span className="modal-kicker">{transferMode === 'withdrawal' ? 'BANCO A EFECTIVO' : 'ENTRE TUS CUENTAS'}</span><h2>{transferMode === 'withdrawal' ? 'Retirar efectivo' : 'Transferir dinero'}</h2></div><button className="icon-close" onClick={() => setTransfer(null)} aria-label="Cerrar"><IonIcon icon={closeOutline} /></button></div>
@@ -406,15 +465,23 @@ export default function App({ themeMode, onThemeToggle, onLogout, onPasswordChan
   );
 }
 
-function CategoryManager({ open, initialKind, categories, onClose, onSave }: { open: boolean; initialKind: 'income' | 'expense'; categories: Category[]; onClose: () => void; onSave: (categories: Category[]) => void }) {
+function LedgerActionCell({ value, label, title = 'Clic para revisar o editar', onClick, cellClassName, buttonClassName }: { value: ReactNode; label: string; title?: string; onClick: () => void; cellClassName?: string; buttonClassName?: string }) {
+  return <td className={cellClassName}><button type="button" className={`cell-value ${buttonClassName ?? ''}`.trim()} title={title} aria-label={label} onClick={onClick}>{value}</button></td>;
+}
+
+function CategoryManager({ open, initialKind, initialCategory, categories, onClose, onSave }: { open: boolean; initialKind: 'income' | 'expense'; initialCategory: Category | null; categories: Category[]; onClose: () => void; onSave: (categories: Category[]) => void }) {
   const [kind, setKind] = useState<'income' | 'expense'>(initialKind);
   const [name, setName] = useState('');
   const [editingId, setEditingId] = useState<string | null>(null);
   const list = categories.filter((category) => category.kind === kind);
 
   useEffect(() => {
-    if (open) { setKind(initialKind); setName(''); setEditingId(null); }
-  }, [open, initialKind]);
+    if (open) {
+      setKind(initialCategory?.kind ?? initialKind);
+      setName(initialCategory?.name ?? '');
+      setEditingId(initialCategory?.id ?? null);
+    }
+  }, [open, initialKind, initialCategory]);
 
   const save = () => {
     const cleanName = name.trim();

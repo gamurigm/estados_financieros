@@ -93,10 +93,16 @@ h1 { margin: 0; color: var(--navy); font-size: clamp(25px, 3vw, 34px); letter-sp
 .category-row th small { display: block; margin-top: 2px; color: #94a0a9; font-size: 8px; font-weight: 500; }
 .category-row td { padding: 0; text-align: center; background: white; }
 .category-row td.weekend-cell, .daily-total td.weekend-cell, .net-daily td.weekend-cell { background-color: #f1f6f7; }
-.cell-value { width: 100%; min-width: 81px; height: 45px; border: 0; background: transparent; cursor: pointer; font-size: 11px; color: #344f5d; }
+.cell-value { width: 100%; min-width: 81px; height: 45px; border: 0; padding: 0; background: transparent; cursor: pointer; font-size: 11px; color: #344f5d; }
 .cell-value:hover, .cell-value:focus-visible { outline: none; background: #eaf4f7; box-shadow: inset 0 0 0 2px #73abc1; }
 .income-row .cell-value.has-value { color: #08735f; font-weight: 700; }
 .expense-row .cell-value.has-value { color: #b14435; font-weight: 700; }
+.daily-total .cell-value, .net-daily .cell-value, .row-total .cell-value { min-width: 0; color: inherit; font-size: inherit; font-weight: inherit; }
+.row-total .cell-value { text-align: right; padding: 0; }
+.category-name-cell { display: flex; width: 100%; min-height: 54px; flex-direction: column; align-items: flex-start; justify-content: center; gap: 4px; border: 0; padding: 6px 8px; background: transparent; color: inherit; cursor: pointer; font: inherit; text-align: left; }
+.category-name-cell:hover span { text-decoration: underline; }
+.category-name-cell:focus-visible { outline: 2px solid #73abc1; outline-offset: -2px; border-radius: 6px; }
+.category-name-cell small { color: #7b8c96; font-size: 9px; }
 .empty-cell { color: #d2dbe1; font-size: 15px; }
 .row-total { position: sticky; right: 0; z-index: 1; background: #fbfcfd !important; text-align: right; padding: 0 13px 0 8px; color: #294554; font-size: 11px; font-weight: 700; white-space: nowrap; box-shadow: -3px 0 5px #183a4b0a; }
 .daily-total th, .daily-total td, .net-daily th, .net-daily td { height: 45px; text-align: right; padding: 0 8px; white-space: nowrap; font-size: 11px; font-weight: 700; }
