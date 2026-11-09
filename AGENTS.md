@@ -6,6 +6,12 @@
 - La API usa PostgreSQL alojado en Supabase. Los clientes deben consumir los datos mediante la API autenticada existente; no conectarse directamente a PostgreSQL ni duplicar reglas de negocio en el cliente.
 - Conserva la configuración de API y base de datos existente. No reemplaces URLs, credenciales ni variables de entorno por valores locales o de ejemplo.
 
+## Arranque local
+
+- La web local usa la API autenticada existente, configurada mediante `mobile/.env`, y esta API usa PostgreSQL en Supabase.
+- Para iniciar la web, ejecuta `npm run dev`. No uses `npm run local`, Docker Compose, PostgreSQL local ni migraciones para este flujo: apuntan a una base local.
+- No conectes los clientes directamente a Supabase. Conserva las URLs y credenciales configuradas.
+
 ## Paridad de cambios web y móvil
 
 - Cada cambio al código o comportamiento de la web debe implementarse también en el móvil en la misma tarea y entrega, y viceversa; no se debe postergar la versión equivalente para otra tarea.
