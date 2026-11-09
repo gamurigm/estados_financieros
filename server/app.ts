@@ -257,8 +257,10 @@ async function ensureAccountsExist(pool: Pool | PoolClient, movement: ReturnType
   if (result.rows.length !== ids.length) throw new Error('Cuenta no encontrada.');
   if (movement.kind === 'transfer') {
     const types = new Map<string, string>(result.rows.map((row: { account_key: string; account_type: string }) => [row.account_key, row.account_type] as const));
-    if (types.get(movement.account) !== 'bank' || !['bank', 'cash'].includes(types.get(movement.toAccount) ?? '')) {
-      throw new Error('Las transferencias deben salir de una cuenta bancaria.');
+    const sourceType = types.get(movement.account ?? '');
+    const targetType = types.get(movement.toAccount ?? '');
+    if (!((sourceType === 'bank' && (targetType === 'bank' || targetType === 'cash')) || (sourceType === 'cash' && targetType === 'bank'))) {
+      throw new Error('El movimiento entre cuentas no es válido.');
     }
   }
 }

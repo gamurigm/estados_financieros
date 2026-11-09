@@ -135,6 +135,7 @@ export default function MonthlyLedgerScreen() {
             <ActionButton label="Ingreso" symbol="↙" onPress={() => router.push({ pathname: '/movements/new', params: { kind: 'income' } })} />
             <ActionButton label="Gasto" symbol="↗" primary onPress={() => router.push({ pathname: '/movements/new', params: { kind: 'expense' } })} />
             <ActionButton label="Retirar" symbol="↓" onPress={() => router.push({ pathname: '/transfers/new', params: { mode: 'withdrawal' } })} />
+            <ActionButton label="Depositar" symbol="↑" onPress={() => router.push({ pathname: '/transfers/new', params: { mode: 'deposit' } })} />
             <ActionButton label="Transferir" symbol="⇄" onPress={() => router.push('/transfers/new')} />
           </View>
 

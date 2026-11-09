@@ -63,7 +63,7 @@ export default function BalanceSheetScreen() {
               <Text accessibilityRole="header" style={styles.sectionTitle}>Efectivo y bancos</Text>
               <GlassPanel style={styles.accountPanel}>
                 {report.accounts.length ? report.accounts.map((account) => (
-                  <Pressable accessibilityRole={account.kind === 'bank' ? 'button' : undefined} accessibilityLabel={account.kind === 'cash' ? 'El efectivo no admite transferencias directas' : `Transferir desde ${account.name}`} accessibilityHint={account.kind === 'bank' ? 'Abre una transferencia con esta cuenta como origen' : undefined} disabled={account.kind === 'cash'} key={account.id} onPress={() => router.push({ pathname: '/transfers/new', params: { account: account.id } })} style={({ pressed }) => [styles.accountRow, account.kind === 'cash' && styles.accountRowDisabled, pressed && styles.accountRowPressed]}>
+                  <Pressable accessibilityRole="button" accessibilityLabel={account.kind === 'cash' ? 'Depositar efectivo en una cuenta bancaria' : `Transferir desde ${account.name}`} accessibilityHint={account.kind === 'cash' ? 'Abre un depósito desde efectivo a una cuenta bancaria' : 'Abre una transferencia entre cuentas bancarias'} key={account.id} onPress={() => router.push(account.kind === 'cash' ? { pathname: '/transfers/new', params: { mode: 'deposit' } } : { pathname: '/transfers/new', params: { account: account.id } })} style={({ pressed }) => [styles.accountRow, pressed && styles.accountRowPressed]}>
                     <View style={[styles.accountMark, { backgroundColor: account.kind === 'cash' ? colors.tint : colors.expenseTint }]}>
                       <Text style={[styles.accountMarkText, { color: account.kind === 'cash' ? colors.primary : colors.expense }]}>{account.kind === 'cash' ? 'E' : 'B'}</Text>
                     </View>
@@ -112,7 +112,6 @@ const useStyles = createThemedStyles(({ colors }) => StyleSheet.create({
   accountKind: { color: colors.muted, fontSize: 11, marginTop: 3 },
   accountAmount: { color: colors.ink, fontSize: 13, fontVariant: ['tabular-nums'], fontWeight: '800', maxWidth: '39%' },
   accountRowPressed: { opacity: 0.72 },
-  accountRowDisabled: { opacity: 0.65 },
   negative: { color: colors.expense },
   disclosure: { alignItems: 'flex-start', backgroundColor: colors.tint, flexDirection: 'row', gap: 11, marginTop: 18, padding: 15 },
   disclosureMark: { alignItems: 'center', borderColor: colors.primary, borderRadius: 9, borderWidth: 1, color: colors.primary, fontSize: 14, fontWeight: '800', height: 22, lineHeight: 20, textAlign: 'center', width: 22 },

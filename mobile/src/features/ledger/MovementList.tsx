@@ -40,7 +40,8 @@ function MovementRow({ movement, categories, accounts, onPress }: { movement: Mo
   const target = accounts.find((account) => account.id === movement.toAccount);
   const nameFor = (id: string | undefined) => accounts.find((account) => account.id === id)?.name ?? (id === 'bank' ? 'Débito' : 'Efectivo');
   const isWithdrawal = movement.kind === 'transfer' && source?.kind === 'bank' && target?.kind === 'cash';
-  const title = movement.kind === 'transfer' ? isWithdrawal ? 'Retiro de efectivo' : 'Transferencia' : category?.name ?? 'Movimiento';
+  const isDeposit = movement.kind === 'transfer' && source?.kind === 'cash' && target?.kind === 'bank';
+  const title = movement.kind === 'transfer' ? isWithdrawal ? 'Retiro de efectivo' : isDeposit ? 'Depósito de efectivo' : 'Transferencia' : category?.name ?? 'Movimiento';
   const detail = movement.kind === 'transfer'
     ? `${nameFor(movement.account)} → ${nameFor(movement.toAccount)}`
     : movement.kind === 'income'
