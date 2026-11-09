@@ -274,10 +274,11 @@ export default function App({ themeMode, onThemeToggle, onLogout, onPasswordChan
     }
   };
 
-  const startTransfer = () => {
+  const startTransfer = (sourceAccount?: AccountId) => {
     setTransferMode('transfer');
     setTransferError('');
-    setTransfer({ date: localDate(new Date()), amount: '', account: data.accounts[0]?.id ?? 'cash', toAccount: bankAccounts[0]?.id ?? 'bank', note: '' });
+    const account = sourceAccount ?? data.accounts[0]?.id ?? 'cash';
+    setTransfer({ date: localDate(new Date()), amount: '', account, toAccount: data.accounts.find((item) => item.id !== account)?.id ?? account, note: '' });
   };
 
   const startWithdrawal = () => {
@@ -346,7 +347,7 @@ export default function App({ themeMode, onThemeToggle, onLogout, onPasswordChan
             <article className="summary-item income-summary"><span>Ingresos del mes</span><strong>{money.format(incomeTotal)}</strong><small><IonIcon icon={arrowBackOutline} /> Entradas registradas</small></article>
             <article className="summary-item expense-summary"><span>Gastos del mes</span><strong>{money.format(expenseTotal)}</strong><small><IonIcon icon={arrowForwardOutline} /> Salidas registradas</small></article>
             <article className="summary-item net-summary"><span>Balance del mes</span><strong>{money.format(incomeTotal - expenseTotal)}</strong><small>Ingresos menos gastos</small></article>
-            <article className="accounts-summary"><span>Disponible al cierre</span><div>{data.accounts.map((account) => <p key={account.id}><span><i className={`account-dot ${account.kind}`} />{account.name}</span><strong>{money.format(balanceAt(account.id))}</strong></p>)}<p className="debit-total"><span>Total Débito</span><strong>{money.format(bankAccounts.reduce((total, account) => total + balanceAt(account.id), 0))}</strong></p></div></article>
+            <article className="accounts-summary"><span>Disponible al cierre</span><div>{data.accounts.map((account) => <p key={account.id}><span><i className={`account-dot ${account.kind}`} />{account.name}</span><strong>{money.format(balanceAt(account.id))}</strong></p>)}<p className="debit-total"><span>Total Débito</span><strong>{money.format(bankAccounts.reduce((total, account) => total + balanceAt(account.id), 0))}</strong></p><p className="account-total"><span>Total General · Efectivo + Débito</span><strong>{money.format(data.accounts.reduce((total, account) => total + balanceAt(account.id), 0))}</strong></p></div></article>
           </section>
 
           <section className="sheet-section">
@@ -423,8 +424,8 @@ export default function App({ themeMode, onThemeToggle, onLogout, onPasswordChan
             <footer className="sheet-footer"><span>Datos guardados en tu cuenta.</span><span><i className="account-dot cash" /> Efectivo <i className="account-dot bank" /> Débito</span></footer>
           </section>
           </> : section === 'budget' ? <BudgetPage data={data} month={month} onMonthChange={setMonth} />
-            : section === 'analysis' ? <AnalysisPage data={data} month={month} onMonthChange={setMonth} />
-              : section === 'balance-sheet' ? <BalanceSheetPage data={data} asOfDate={balanceAsOfDate} onAsOfDateChange={setBalanceAsOfDate} />
+            : section === 'analysis' ? <AnalysisPage data={data} />
+              : section === 'balance-sheet' ? <BalanceSheetPage data={data} asOfDate={balanceAsOfDate} onAsOfDateChange={setBalanceAsOfDate} onTransfer={startTransfer} />
                 : <CashFlowPage data={data} startDate={cashFlowStartDate} endDate={cashFlowEndDate} onStartDateChange={setCashFlowStartDate} onEndDateChange={setCashFlowEndDate} />}
             </div>
           </div>

@@ -1,5 +1,5 @@
 import { useCallback, useMemo, useState } from 'react';
-import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useFocusEffect } from 'expo-router';
 import { loadFinanceState } from '../src/api/client';
@@ -55,7 +55,7 @@ export default function BalanceSheetScreen() {
               <Text accessibilityRole="header" style={styles.sectionTitle}>Efectivo y bancos</Text>
               <GlassPanel style={styles.accountPanel}>
                 {report.accounts.length ? report.accounts.map((account) => (
-                  <View key={account.id} style={styles.accountRow}>
+                  <Pressable accessibilityRole="button" accessibilityLabel={`Transferir desde ${account.name}`} accessibilityHint="Abre una transferencia con esta cuenta como origen" key={account.id} onPress={() => router.push({ pathname: '/transfers/new', params: { account: account.id } })} style={({ pressed }) => [styles.accountRow, pressed && styles.accountRowPressed]}>
                     <View style={[styles.accountMark, { backgroundColor: account.kind === 'cash' ? colors.tint : colors.expenseTint }]}>
                       <Text style={[styles.accountMarkText, { color: account.kind === 'cash' ? colors.primary : colors.expense }]}>{account.kind === 'cash' ? 'E' : 'B'}</Text>
                     </View>
@@ -64,7 +64,7 @@ export default function BalanceSheetScreen() {
                       <Text style={styles.accountKind}>{account.kind === 'cash' ? 'Efectivo' : 'Cuenta bancaria'}</Text>
                     </View>
                     <Text adjustsFontSizeToFit numberOfLines={1} style={[styles.accountAmount, account.amount < 0 && styles.negative]}>{currency.format(account.amount)}</Text>
-                  </View>
+                  </Pressable>
                 )) : <Text style={styles.helper}>No hay cuentas registradas en esta fecha.</Text>}
               </GlassPanel>
 
@@ -100,6 +100,7 @@ const useStyles = createThemedStyles(({ colors }) => StyleSheet.create({
   accountName: { color: colors.ink, fontSize: 14, fontWeight: '700' },
   accountKind: { color: colors.muted, fontSize: 11, marginTop: 3 },
   accountAmount: { color: colors.ink, fontSize: 13, fontVariant: ['tabular-nums'], fontWeight: '800', maxWidth: '39%' },
+  accountRowPressed: { opacity: 0.72 },
   negative: { color: colors.expense },
   disclosure: { alignItems: 'flex-start', backgroundColor: colors.tint, flexDirection: 'row', gap: 11, marginTop: 18, padding: 15 },
   disclosureMark: { alignItems: 'center', borderColor: colors.primary, borderRadius: 9, borderWidth: 1, color: colors.primary, fontSize: 14, fontWeight: '800', height: 22, lineHeight: 20, textAlign: 'center', width: 22 },

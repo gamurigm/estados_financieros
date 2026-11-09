@@ -49,6 +49,26 @@ export function getCashFlow(state: Pick<FinanceState, 'accounts' | 'movements'>,
   };
 }
 
+export function getPreviousRange(startDate: string, endDate: string) {
+  if (!isValidDate(startDate) || !isValidDate(endDate) || startDate > endDate) return null;
+  const days = Math.round((Date.parse(`${endDate}T00:00:00Z`) - Date.parse(`${startDate}T00:00:00Z`)) / 86400000) + 1;
+  const previousEnd = previousDate(startDate);
+  const previousStart = new Date(`${previousEnd}T00:00:00Z`);
+  previousStart.setUTCDate(previousStart.getUTCDate() - days + 1);
+  return { startDate: previousStart.toISOString().slice(0, 10), endDate: previousEnd };
+}
+
+export function getExpenseCategoryBreakdownForRange(state: Pick<FinanceState, 'categories' | 'movements'>, startDate: string, endDate: string): ExpenseCategoryTotal[] {
+  const categoryNames = new Map(state.categories.filter((category) => category.kind === 'expense').map((category) => [category.id, category.name]));
+  const totals = new Map<string, number>();
+  for (const movement of state.movements) {
+    if (movement.kind !== 'expense' || movement.date < startDate || movement.date > endDate || !movement.categoryId) continue;
+    totals.set(movement.categoryId, (totals.get(movement.categoryId) ?? 0) + movement.amount);
+  }
+  return [...totals.entries()].map(([categoryId, amount]) => ({ categoryId, name: categoryNames.get(categoryId) ?? 'Rubro', amount: roundCurrency(amount) }))
+    .sort((left, right) => right.amount - left.amount || left.name.localeCompare(right.name, 'es'));
+}
+
 export function getMonthlyTrend(state: FinanceState, endMonth: string): MonthlyTrendPoint[] {
   return Array.from({ length: 6 }, (_, index) => moveMonth(endMonth, index - 5)).map((month) => {
     const movements = state.movements.filter((movement) => movement.date.startsWith(`${month}-`));

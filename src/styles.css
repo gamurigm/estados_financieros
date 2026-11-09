@@ -62,6 +62,9 @@ h1 { margin: 0; color: var(--navy); font-size: clamp(25px, 3vw, 34px); letter-sp
 .accounts-summary p strong { font-size: 13px; }
 .accounts-summary .debit-total { border-top: 1px solid var(--line); font-weight: 750; }
 .accounts-summary .debit-total strong { color: var(--navy); }
+.statement-account-hint { margin: 13px 0 0; color: var(--muted); font-size: 11px; }
+.accounts-summary .account-total { border-top: 1px solid var(--line); font-weight: 800; }
+.accounts-summary .account-total strong { color: var(--navy); }
 .account-dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: #22876d; vertical-align: middle; }
 .account-dot.bank { background: #3478b5; }
 .sheet-section { background: var(--paper); border: 1px solid var(--line); border-radius: 12px; overflow: hidden; box-shadow: 0 8px 24px #183a4b0b; }
@@ -296,6 +299,20 @@ h1 { margin: 0; color: var(--navy); font-size: clamp(25px, 3vw, 34px); letter-sp
 .analysis-metric { min-width: 0; min-height: 87px; display: flex; flex-direction: column; justify-content: center; gap: 8px; padding: 14px 17px; border: 1px solid var(--line); border-radius: 10px; background: var(--paper); }
 .analysis-metric span { color: var(--muted); font-size: 11px; }
 .analysis-metric strong { overflow-wrap: anywhere; color: var(--ink); font-size: clamp(16px, 1.8vw, 21px); letter-spacing: -.025em; }
+.analysis-heading { align-items: center; }
+.analysis-range { display: grid; grid-template-columns: repeat(2, minmax(150px, 1fr)); gap: 8px; }
+.analysis-range .report-date-field input { min-width: 0; }
+.analysis-presets { grid-column: 1 / -1; display: flex; justify-content: flex-end; gap: 5px; }
+.analysis-presets button { padding: 6px 9px; border: 1px solid var(--border); border-radius: 999px; background: var(--surface); color: var(--muted); font-size: 10px; font-weight: 700; cursor: pointer; }
+.analysis-presets button:hover { border-color: var(--primary); color: var(--primary); }
+.analysis-insights { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 9px; margin: 10px 0 13px; }
+.analysis-insights article { display: grid; min-width: 0; gap: 6px; padding: 13px 15px; border: 1px solid var(--border); border-radius: 15px; background: var(--surface); }
+.analysis-insights article > span { color: var(--muted); font-size: 10px; }
+.analysis-insights article strong { color: var(--ink); font-size: 17px; font-variant-numeric: tabular-nums; }
+.analysis-insights article small, .category-change { color: var(--muted); font-size: 10px; }
+.analysis-insights .insight-up { color: var(--expense); }
+.analysis-insights .insight-down { color: var(--primary); }
+.category-change { display: block; margin-top: 5px; }
 .income-metric strong { color: var(--mint); }
 .expense-metric strong { color: var(--orange); }
 .balance-metric { background: var(--navy); }
@@ -333,6 +350,9 @@ h1 { margin: 0; color: var(--navy); font-size: clamp(25px, 3vw, 34px); letter-sp
 
 @media (max-width: 900px) {
   .finance-layout { grid-template-columns: 174px minmax(0, 1fr); gap: 15px; }
+  .analysis-heading { align-items: stretch; flex-direction: column; }
+  .analysis-range { width: 100%; }
+  .analysis-presets { justify-content: flex-start; }
   .analysis-layout { grid-template-columns: 1fr; }
   .budget-layout { grid-template-columns: minmax(0, 1fr) minmax(250px, .85fr); }
 }
@@ -629,7 +649,9 @@ h1, .sheet-heading h2, .modal-heading h2 { color: var(--ink); }
 .statement-date { margin-top: 9px; color: var(--hero-muted); font-size: 12px; }
 .statement-accounts { min-height: 285px; padding: 23px; }
 .statement-account-list { margin-top: 16px; }
-.statement-account-row { display: flex; align-items: center; gap: 12px; padding: 15px 0; border-top: 1px solid var(--line-soft); }
+.statement-account-row { display: flex; width: 100%; align-items: center; gap: 12px; padding: 15px 0; border: 0; border-top: 1px solid var(--line-soft); background: transparent; color: inherit; text-align: left; cursor: pointer; transition: background .15s ease, padding .15s ease; }
+.statement-account-row:hover { padding-right: 10px; padding-left: 10px; border-radius: 12px; background: var(--surface-elevated); }
+.statement-account-row:focus-visible { outline: 3px solid var(--primary); outline-offset: 2px; border-radius: 12px; }
 .statement-account-mark { display: grid; width: 42px; height: 42px; flex: 0 0 42px; place-items: center; border: 1px solid var(--border); border-radius: 14px; background: var(--surface-elevated); color: var(--primary); font-size: 14px; font-weight: 800; }
 .statement-account-mark.bank { color: var(--accent); }
 .statement-account-copy { display: grid; min-width: 0; flex: 1; gap: 4px; }

@@ -105,8 +105,10 @@ test('debit balance sums every bank and ignores balances before an account start
 
   assert.equal(january.balances.cash, 20);
   assert.equal(january.debitTotal, 35);
+  assert.equal(january.totalBalance, 55);
   assert.deepEqual(february.balances, { cash: 30, bank: 25, 'bank-2': 70 });
   assert.equal(february.debitTotal, 95);
+  assert.equal(february.totalBalance, 125);
   assert.equal(february.income, 20);
   assert.equal(february.expenses, 0);
 });

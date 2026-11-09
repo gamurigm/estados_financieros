@@ -144,6 +144,7 @@ export default function MonthlyLedgerScreen() {
             {(data?.accounts ?? []).filter((account) => account.kind === 'bank').map((account) => <Balance key={account.id} label={`${account.name} al cierre`} amount={summary.balances[account.id] ?? 0} />)}
             <View style={styles.accountDivider} />
             <Balance label="Total Débito" amount={summary.debitTotal} />
+            <Balance label="Total General · Efectivo + Débito" amount={summary.totalBalance} />
           </GlassPanel>
           <View style={styles.settingsRow}>
             <Button label="Rubros" onPress={() => router.push('/categories')} style={styles.settingsButton} variant="secondary" />

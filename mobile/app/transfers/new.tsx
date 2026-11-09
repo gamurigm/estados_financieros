@@ -20,7 +20,7 @@ import { Button, Input, ScreenHeader, createThemedStyles, GlassPanel } from '../
 const currency = new Intl.NumberFormat('es-EC', { style: 'currency', currency: 'USD' });
 
 export default function NewTransferScreen() {
-  const { mode } = useLocalSearchParams<{ mode?: string }>();
+  const { mode, account: sourceAccount } = useLocalSearchParams<{ mode?: string; account?: string }>();
   const withdrawal = mode === 'withdrawal';
   const { ui, styles } = useStyles();
   const [accounts, setAccounts] = useState<Account[]>([]);
@@ -47,8 +47,8 @@ export default function NewTransferScreen() {
       const cashAccount = state.accounts.find((account) => account.kind === 'cash');
       setDraft((current) => ({
         ...current,
-        account: withdrawal ? bank?.id ?? 'bank' : cashAccount?.id ?? 'cash',
-        toAccount: withdrawal ? cashAccount?.id ?? 'cash' : bank?.id ?? 'bank',
+        account: withdrawal ? bank?.id ?? 'bank' : state.accounts.some((item) => item.id === sourceAccount) ? sourceAccount! : cashAccount?.id ?? 'cash',
+        toAccount: withdrawal ? cashAccount?.id ?? 'cash' : state.accounts.find((item) => item.id !== (state.accounts.some((candidate) => candidate.id === sourceAccount) ? sourceAccount : cashAccount?.id))?.id ?? bank?.id ?? 'bank',
       }));
       if (withdrawal && !bank) setError('Agrega una cuenta bancaria antes de retirar efectivo.');
     }).catch((loadError) => {
@@ -57,7 +57,7 @@ export default function NewTransferScreen() {
       if (active) setLoading(false);
     });
     return () => { active = false; };
-  }, [withdrawal, retry]);
+  }, [withdrawal, retry, sourceAccount]);
 
   async function submit() {
     if (withdrawal && (!banks.some((account) => account.id === draft.account) || !cash)) {

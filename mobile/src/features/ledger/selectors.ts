@@ -6,6 +6,7 @@ export type MonthlySummary = {
   net: number;
   balances: Record<AccountId, number>;
   debitTotal: number;
+  totalBalance: number;
   movements: Movement[];
 };
 
@@ -52,6 +53,7 @@ export function getMonthlySummary(
     debitTotal: state.accounts
       .filter((account) => account.kind === 'bank')
       .reduce((total, account) => total + balances[account.id], 0),
+    totalBalance: Object.values(balances).reduce((total, balance) => total + balance, 0),
     movements,
   };
 }

@@ -4,10 +4,11 @@ import { getBalanceSheet } from './selectors';
 const currency = new Intl.NumberFormat('es-EC', { style: 'currency', currency: 'USD' });
 const formatDate = (date: string) => new Intl.DateTimeFormat('es-EC', { dateStyle: 'long' }).format(new Date(`${date}T12:00:00`));
 
-export function BalanceSheetPage({ data, asOfDate, onAsOfDateChange }: {
+export function BalanceSheetPage({ data, asOfDate, onAsOfDateChange, onTransfer }: {
   data: FinanceState;
   asOfDate: string;
   onAsOfDateChange: (date: string) => void;
+  onTransfer: (accountId: string) => void;
 }) {
   const report = getBalanceSheet(data, asOfDate);
 
@@ -26,11 +27,11 @@ export function BalanceSheetPage({ data, asOfDate, onAsOfDateChange }: {
         </section>
         <section className="analysis-panel statement-accounts">
           <div className="analysis-panel-heading"><div><h2>Efectivo y cuentas bancarias</h2><p>{report.accounts.length} {report.accounts.length === 1 ? 'cuenta' : 'cuentas'} activas en esta fecha</p></div></div>
-          {report.accounts.length ? <div className="statement-account-list">{report.accounts.map((account) => <div className="statement-account-row" key={account.id}>
+          {report.accounts.length ? <><p className="statement-account-hint">Selecciona una cuenta para transferir desde ella</p><div className="statement-account-list">{report.accounts.map((account) => <button className="statement-account-row" key={account.id} type="button" onClick={() => onTransfer(account.id)} aria-label={`Transferir desde ${account.name}`}>
             <span className={`statement-account-mark ${account.kind}`} aria-hidden="true">{account.kind === 'cash' ? 'E' : 'B'}</span>
             <div className="statement-account-copy"><strong>{account.name}</strong><span>{account.kind === 'cash' ? 'Efectivo' : 'Cuenta bancaria'}</span></div>
             <strong className={`statement-account-amount ${account.amount < 0 ? 'negative-value' : ''}`}>{currency.format(account.amount)}</strong>
-          </div>)}</div> : <p className="feature-empty">No hay cuentas registradas en esta fecha.</p>}
+          </button>)}</div></> : <p className="feature-empty">No hay cuentas registradas en esta fecha.</p>}
         </section>
       </div>
       <aside className="statement-disclosure"><span aria-hidden="true">i</span><p><strong>Pasivos y patrimonio no calculados</strong><small>La app no registra deudas ni otras obligaciones. Este balance usa solo saldos registrados y no proyecta fechas futuras.</small></p></aside>
