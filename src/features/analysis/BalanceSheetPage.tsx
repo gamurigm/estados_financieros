@@ -1,5 +1,6 @@
 import type { FinanceState } from '../../api';
 import { getBalanceSheet } from './selectors';
+import { useState } from 'react';
 
 const currency = new Intl.NumberFormat('es-EC', { style: 'currency', currency: 'USD' });
 const formatDate = (date: string) => new Intl.DateTimeFormat('es-EC', { dateStyle: 'long' }).format(new Date(`${date}T12:00:00`));
@@ -10,6 +11,7 @@ export function BalanceSheetPage({ data, asOfDate, onAsOfDateChange, onTransfer 
   onAsOfDateChange: (date: string) => void;
   onTransfer: (accountId: string) => void;
 }) {
+  const [amountBlurred, setAmountBlurred] = useState(false);
   const report = getBalanceSheet(data, asOfDate);
 
   return <section>
@@ -22,12 +24,12 @@ export function BalanceSheetPage({ data, asOfDate, onAsOfDateChange, onTransfer 
         <section className="statement-hero">
           <span className="statement-icon" aria-hidden="true">◈</span>
           <p className="statement-kicker">Activos líquidos registrados</p>
-          <strong className="statement-total">{currency.format(report.total)}</strong>
+          <div className="statement-total-row"><strong className={`statement-total${amountBlurred ? ' is-blurred' : ''}`}>{currency.format(report.total)}</strong><button className="statement-privacy-toggle" type="button" aria-pressed={amountBlurred} aria-label={amountBlurred ? 'Mostrar activos líquidos' : 'Desenfocar activos líquidos'} onClick={() => setAmountBlurred((value) => !value)}>{amountBlurred ? 'Mostrar' : 'Ocultar'}</button></div>
           <span className="statement-date">Al {formatDate(report.asOfDate)}</span>
         </section>
         <section className="analysis-panel statement-accounts">
           <div className="analysis-panel-heading"><div><h2>Efectivo y cuentas bancarias</h2><p>{report.accounts.length} {report.accounts.length === 1 ? 'cuenta' : 'cuentas'} activas en esta fecha</p></div></div>
-          {report.accounts.length ? <><p className="statement-account-hint">Selecciona una cuenta para transferir desde ella</p><div className="statement-account-list">{report.accounts.map((account) => <button className="statement-account-row" key={account.id} type="button" onClick={() => onTransfer(account.id)} aria-label={`Transferir desde ${account.name}`}>
+          {report.accounts.length ? <><p className="statement-account-hint">Selecciona una cuenta bancaria para transferir</p><div className="statement-account-list">{report.accounts.map((account) => <button className={`statement-account-row${account.kind === 'cash' ? ' is-static' : ''}`} key={account.id} type="button" disabled={account.kind === 'cash'} onClick={() => onTransfer(account.id)} aria-label={account.kind === 'cash' ? 'El efectivo no admite transferencias directas' : `Transferir desde ${account.name}`}>
             <span className={`statement-account-mark ${account.kind}`} aria-hidden="true">{account.kind === 'cash' ? 'E' : 'B'}</span>
             <div className="statement-account-copy"><strong>{account.name}</strong><span>{account.kind === 'cash' ? 'Efectivo' : 'Cuenta bancaria'}</span></div>
             <strong className={`statement-account-amount ${account.amount < 0 ? 'negative-value' : ''}`}>{currency.format(account.amount)}</strong>

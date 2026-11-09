@@ -43,14 +43,17 @@ export default function NewTransferScreen() {
       if (!active) return;
       setFinanceState(state);
       setAccounts(state.accounts);
-      const bank = state.accounts.find((account) => account.kind === 'bank');
+      const bankAccounts = state.accounts.filter((account) => account.kind === 'bank');
+      const bank = bankAccounts[0];
       const cashAccount = state.accounts.find((account) => account.kind === 'cash');
+      const source = bankAccounts.find((account) => account.id === sourceAccount) ?? bank;
       setDraft((current) => ({
         ...current,
-        account: withdrawal ? bank?.id ?? 'bank' : state.accounts.some((item) => item.id === sourceAccount) ? sourceAccount! : cashAccount?.id ?? 'cash',
-        toAccount: withdrawal ? cashAccount?.id ?? 'cash' : state.accounts.find((item) => item.id !== (state.accounts.some((candidate) => candidate.id === sourceAccount) ? sourceAccount : cashAccount?.id))?.id ?? bank?.id ?? 'bank',
+        account: withdrawal ? bank?.id ?? 'bank' : source?.id ?? 'bank',
+        toAccount: withdrawal ? cashAccount?.id ?? 'cash' : bankAccounts.find((item) => item.id !== source?.id)?.id ?? 'bank',
       }));
       if (withdrawal && !bank) setError('Agrega una cuenta bancaria antes de retirar efectivo.');
+      if (!withdrawal && bankAccounts.length < 2) setError('Agrega dos cuentas bancarias para transferir.');
     }).catch((loadError) => {
       if (active) setError(loadError instanceof Error ? loadError.message : 'No se pudieron cargar tus cuentas.');
     }).finally(() => {
@@ -62,6 +65,10 @@ export default function NewTransferScreen() {
   async function submit() {
     if (withdrawal && (!banks.some((account) => account.id === draft.account) || !cash)) {
       setError('Selecciona una cuenta bancaria válida.');
+      return;
+    }
+    if (!withdrawal && (!banks.some((account) => account.id === draft.account) || !banks.some((account) => account.id === draft.toAccount))) {
+      setError('Las transferencias solo se hacen entre cuentas bancarias.');
       return;
     }
     const availableBalance = financeState
@@ -110,7 +117,7 @@ export default function NewTransferScreen() {
       ...current,
       account,
       ...(!withdrawal && current.toAccount === account
-        ? { toAccount: accounts.find((item) => item.id !== account)?.id ?? current.toAccount }
+        ? { toAccount: banks.find((item) => item.id !== account)?.id ?? current.toAccount }
         : {}),
     }));
     setError('');
@@ -119,19 +126,20 @@ export default function NewTransferScreen() {
   if (loading) return <SafeAreaView style={styles.safeArea}><View style={styles.state}><Text style={styles.helper}>Cargando cuentas…</Text></View></SafeAreaView>;
   if (!accounts.length) return <SafeAreaView style={styles.safeArea}><ScreenHeader title={withdrawal ? 'Retirar efectivo' : 'Transferir dinero'} subtitle="No se cargaron tus cuentas" onBack={() => router.back()} /><View style={styles.state}><Text style={styles.helper}>{error || 'No se pudieron cargar las cuentas.'}</Text><Button label="Reintentar" onPress={() => { setLoading(true); setRetry((value) => value + 1); }} style={styles.submitButton} /></View></SafeAreaView>;
   if (withdrawal && !banks.length) return <SafeAreaView style={styles.safeArea}><ScreenHeader title="Retirar efectivo" subtitle="De tu banco al efectivo" onBack={() => router.back()} /><View style={styles.state}><Text style={styles.helper}>{error || 'Agrega una cuenta bancaria para registrar retiros.'}</Text><Button label="Agregar cuenta" onPress={() => router.push('/balances')} style={styles.submitButton} /></View></SafeAreaView>;
+  if (!withdrawal && banks.length < 2) return <SafeAreaView style={styles.safeArea}><ScreenHeader title="Transferir dinero" subtitle="Entre cuentas bancarias" onBack={() => router.back()} /><View style={styles.state}><Text style={styles.helper}>{error || 'Agrega dos cuentas bancarias para transferir.'}</Text><Button label="Agregar cuenta" onPress={() => router.push('/balances')} style={styles.submitButton} /></View></SafeAreaView>;
 
   return (
     <SafeAreaView style={styles.safeArea}>
       <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
-        <ScreenHeader title={withdrawal ? 'Retirar efectivo' : 'Transferir dinero'} subtitle={withdrawal ? 'De tu banco al efectivo' : 'Entre tus cuentas'} onBack={() => router.back()} />
+        <ScreenHeader title={withdrawal ? 'Retirar efectivo' : 'Transferir dinero'} subtitle={withdrawal ? 'De tu banco al efectivo' : 'Entre cuentas bancarias'} onBack={() => router.back()} />
         <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag">
           <GlassPanel style={styles.card}>
             <Text style={styles.helper}>{withdrawal ? 'Se resta de la cuenta bancaria y se suma al efectivo.' : 'El traslado cambia los saldos, pero no cuenta como ingreso ni gasto.'}</Text>
             <Text style={styles.dateHint}>Saldos disponibles al {draft.date}</Text>
             <Text style={styles.label}>Monto (USD)</Text>
             <Input accessibilityLabel="Monto en dólares" editable={savedId === null && !saving} keyboardType="decimal-pad" onChangeText={(amount) => { setDraft((current) => ({ ...current, amount })); setError(''); }} placeholder="0,00" style={ui.amount} value={draft.amount} />
-            <AccountPicker accounts={withdrawal ? banks : accounts} balanceForAccount={availableAt} disabled={savedId !== null || saving} label="Desde" value={draft.account} onChange={changeSource} />
-            {withdrawal ? <><Text style={styles.label}>Hacia: {cash?.name ?? 'Efectivo'}</Text><Text style={styles.dateHint}>Saldo al {draft.date}: {currency.format(cash ? availableAt(cash.id) : 0)}</Text></> : <AccountPicker accounts={accounts.filter((account) => account.id !== draft.account)} balanceForAccount={availableAt} disabled={savedId !== null || saving} label="Hacia" value={draft.toAccount} onChange={(toAccount) => { setDraft((current) => ({ ...current, toAccount })); setError(''); }} />}
+            <AccountPicker accounts={banks} balanceForAccount={availableAt} disabled={savedId !== null || saving} label="Desde" value={draft.account} onChange={changeSource} />
+            {withdrawal ? <><Text style={styles.label}>Hacia: {cash?.name ?? 'Efectivo'}</Text><Text style={styles.dateHint}>Saldo al {draft.date}: {currency.format(cash ? availableAt(cash.id) : 0)}</Text></> : <AccountPicker accounts={banks.filter((account) => account.id !== draft.account)} balanceForAccount={availableAt} disabled={savedId !== null || saving} label="Hacia" value={draft.toAccount} onChange={(toAccount) => { setDraft((current) => ({ ...current, toAccount })); setError(''); }} />}
             <Text style={styles.label}>Fecha</Text>
             <Input accessibilityLabel="Fecha" editable={savedId === null && !saving} keyboardType="numbers-and-punctuation" onChangeText={(date) => { setDraft((current) => ({ ...current, date })); setError(''); }} placeholder="AAAA-MM-DD" value={draft.date} />
             <Text style={styles.dateHint}>Formato: AAAA-MM-DD</Text>

@@ -577,6 +577,8 @@ h1, .sheet-heading h2, .modal-heading h2 { color: var(--ink); }
 
 .form-modal { --background: var(--surface-solid); --border-radius: 22px; }
 .form-modal::part(content) { border: 1px solid var(--border); border-radius: 22px; background: var(--surface-solid); box-shadow: 0 18px 55px #00000040; backdrop-filter: blur(24px); }
+ion-popover.transfer-account-popover { --background: var(--surface-solid, #fff); }
+ion-popover.transfer-account-popover::part(content) { background: var(--surface-solid, #fff); opacity: 1; }
 .icon-close { border-radius: 12px; background: var(--surface); color: var(--muted); }
 .form-item { --background: var(--input); --border-color: var(--border); border-color: var(--border); border-radius: 14px; }
 .form-item ion-input, .form-item ion-select, .form-item ion-textarea { --color: var(--ink); --placeholder-color: var(--muted); }
@@ -645,12 +647,17 @@ h1, .sheet-heading h2, .modal-heading h2 { color: var(--ink); }
 .statement-hero { display: flex; min-height: 285px; flex-direction: column; justify-content: flex-end; align-items: flex-start; padding: 30px; background: radial-gradient(ellipse at 10% 10%, var(--cyan-glow), transparent 44%), radial-gradient(ellipse at 100% 0%, var(--violet-glow), transparent 42%), var(--hero); }
 .statement-icon { display: grid; width: 48px; height: 48px; place-items: center; margin-bottom: auto; border: 1px solid var(--border); border-radius: 16px; background: var(--surface); color: var(--primary); font-size: 26px; }
 .statement-kicker, .flow-kicker { margin: 0; color: var(--hero-muted); font-size: 13px; font-weight: 700; }
-.statement-total { max-width: 100%; margin-top: 10px; overflow-wrap: anywhere; color: var(--accent); font-size: clamp(32px, 4vw, 50px); font-variant-numeric: tabular-nums; font-weight: 850; letter-spacing: -.055em; }
+.statement-total-row { display: flex; max-width: 100%; align-items: center; gap: 12px; margin-top: 10px; }
+.statement-total { max-width: 100%; overflow-wrap: anywhere; color: var(--accent); font-size: clamp(32px, 4vw, 50px); font-variant-numeric: tabular-nums; font-weight: 850; letter-spacing: -.055em; transition: filter .18s ease; }
+.statement-total.is-blurred { filter: blur(8px); user-select: none; }
+.statement-privacy-toggle { flex: 0 0 auto; padding: 6px 9px; border: 1px solid var(--border); border-radius: 9px; background: var(--surface); color: var(--hero-muted); font-size: 11px; font-weight: 700; cursor: pointer; }
 .statement-date { margin-top: 9px; color: var(--hero-muted); font-size: 12px; }
 .statement-accounts { min-height: 285px; padding: 23px; }
 .statement-account-list { margin-top: 16px; }
 .statement-account-row { display: flex; width: 100%; align-items: center; gap: 12px; padding: 15px 0; border: 0; border-top: 1px solid var(--line-soft); background: transparent; color: inherit; text-align: left; cursor: pointer; transition: background .15s ease, padding .15s ease; }
 .statement-account-row:hover { padding-right: 10px; padding-left: 10px; border-radius: 12px; background: var(--surface-elevated); }
+.statement-account-row.is-static { cursor: default; }
+.statement-account-row.is-static:hover { padding-right: 0; padding-left: 0; background: transparent; }
 .statement-account-row:focus-visible { outline: 3px solid var(--primary); outline-offset: 2px; border-radius: 12px; }
 .statement-account-mark { display: grid; width: 42px; height: 42px; flex: 0 0 42px; place-items: center; border: 1px solid var(--border); border-radius: 14px; background: var(--surface-elevated); color: var(--primary); font-size: 14px; font-weight: 800; }
 .statement-account-mark.bank { color: var(--accent); }

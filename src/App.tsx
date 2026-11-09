@@ -214,7 +214,8 @@ export default function App({ themeMode, onThemeToggle, onLogout, onPasswordChan
     const source = data.accounts.find((account) => account.id === transfer.account);
     const target = data.accounts.find((account) => account.id === transfer.toAccount);
     if (!source || !target || transfer.account === transfer.toAccount
-      || (transferMode === 'withdrawal' && (source.kind !== 'bank' || target.kind !== 'cash'))) {
+      || source.kind !== 'bank'
+      || (transferMode === 'withdrawal' ? target.kind !== 'cash' : target.kind !== 'bank')) {
       return setTransferError('Elige cuentas válidas y distintas.');
     }
     const available = balanceAt(transfer.account, transfer.date);
@@ -275,10 +276,14 @@ export default function App({ themeMode, onThemeToggle, onLogout, onPasswordChan
   };
 
   const startTransfer = (sourceAccount?: AccountId) => {
+    if (bankAccounts.length < 2) {
+      setToast('Agrega dos cuentas bancarias para transferir.');
+      return;
+    }
     setTransferMode('transfer');
     setTransferError('');
-    const account = sourceAccount ?? data.accounts[0]?.id ?? 'cash';
-    setTransfer({ date: localDate(new Date()), amount: '', account, toAccount: data.accounts.find((item) => item.id !== account)?.id ?? account, note: '' });
+    const account = bankAccounts.some((item) => item.id === sourceAccount) ? sourceAccount! : bankAccounts[0].id;
+    setTransfer({ date: localDate(new Date()), amount: '', account, toAccount: bankAccounts.find((item) => item.id !== account)!.id, note: '' });
   };
 
   const startWithdrawal = () => {
@@ -463,16 +468,16 @@ export default function App({ themeMode, onThemeToggle, onLogout, onPasswordChan
       <CategoryManager open={categoryOpen !== null} initialKind={categoryOpen ?? 'expense'} initialCategory={categoryEditingTarget} categories={data.categories} onClose={() => { setCategoryOpen(null); setCategoryEditingTarget(null); }} onSave={saveCategories} />
 
       <IonModal isOpen={!!transfer} onDidDismiss={() => { setTransfer(null); setTransferError(''); }} className="form-modal">
-        <div className="modal-shell"><div className="modal-heading"><div><span className="modal-kicker">{transferMode === 'withdrawal' ? 'BANCO A EFECTIVO' : 'ENTRE TUS CUENTAS'}</span><h2>{transferMode === 'withdrawal' ? 'Retirar efectivo' : 'Transferir dinero'}</h2></div><button className="icon-close" onClick={() => setTransfer(null)} disabled={transferSaving} aria-label="Cerrar"><IonIcon icon={closeOutline} /></button></div>
+        <div className="modal-shell"><div className="modal-heading"><div><span className="modal-kicker">{transferMode === 'withdrawal' ? 'BANCO A EFECTIVO' : 'ENTRE CUENTAS BANCARIAS'}</span><h2>{transferMode === 'withdrawal' ? 'Retirar efectivo' : 'Transferir dinero'}</h2></div><button className="icon-close" onClick={() => setTransfer(null)} disabled={transferSaving} aria-label="Cerrar"><IonIcon icon={closeOutline} /></button></div>
           {transfer && <div className="form-fields"><p className="helper-copy">Saldos disponibles al {transfer.date}. El traslado no cuenta como ingreso ni gasto.</p>
             <IonItem className="form-item"><IonInput label="Monto" labelPlacement="stacked" type="number" min="0.01" step="0.01" placeholder="0,00" value={transfer.amount} onIonInput={(event) => { setTransfer({ ...transfer, amount: String(event.detail.value ?? '') }); setTransferError(''); }} /></IonItem>
-            <IonItem className="form-item"><IonSelect label="Desde" labelPlacement="stacked" value={transfer.account} onIonChange={(event) => {
+            <IonItem className="form-item"><IonSelect label="Desde" labelPlacement="stacked" interface="popover" interfaceOptions={{ cssClass: 'transfer-account-popover' }} value={transfer.account} onIonChange={(event) => {
               const account = String(event.detail.value);
-              const toAccount = transferMode === 'withdrawal' || transfer.toAccount !== account ? transfer.toAccount : data.accounts.find((item) => item.id !== account)?.id ?? account;
+              const toAccount = transferMode === 'withdrawal' || transfer.toAccount !== account ? transfer.toAccount : bankAccounts.find((item) => item.id !== account)?.id ?? account;
               setTransfer({ ...transfer, account, toAccount });
               setTransferError('');
-            }}>{(transferMode === 'withdrawal' ? bankAccounts : data.accounts).map((account) => <IonSelectOption key={account.id} value={account.id}>{account.name} · {money.format(balanceAt(account.id, transfer.date))}</IonSelectOption>)}</IonSelect></IonItem>
-            {transferMode === 'withdrawal' ? <IonItem className="form-item"><IonInput label="Hacia" labelPlacement="stacked" readonly value={`Efectivo · ${money.format(balanceAt(transfer.toAccount, transfer.date))}`} /></IonItem> : <IonItem className="form-item"><IonSelect label="Hacia" labelPlacement="stacked" value={transfer.toAccount} onIonChange={(event) => { setTransfer({ ...transfer, toAccount: String(event.detail.value) }); setTransferError(''); }}>{data.accounts.filter((account) => account.id !== transfer.account).map((account) => <IonSelectOption key={account.id} value={account.id}>{account.name} · {money.format(balanceAt(account.id, transfer.date))}</IonSelectOption>)}</IonSelect></IonItem>}
+            }}>{bankAccounts.map((account) => <IonSelectOption key={account.id} value={account.id}>{account.name} · {money.format(balanceAt(account.id, transfer.date))}</IonSelectOption>)}</IonSelect></IonItem>
+            {transferMode === 'withdrawal' ? <IonItem className="form-item"><IonInput label="Hacia" labelPlacement="stacked" readonly value={`Efectivo · ${money.format(balanceAt(transfer.toAccount, transfer.date))}`} /></IonItem> : <IonItem className="form-item"><IonSelect label="Hacia" labelPlacement="stacked" interface="popover" interfaceOptions={{ cssClass: 'transfer-account-popover' }} value={transfer.toAccount} onIonChange={(event) => { setTransfer({ ...transfer, toAccount: String(event.detail.value) }); setTransferError(''); }}>{bankAccounts.filter((account) => account.id !== transfer.account).map((account) => <IonSelectOption key={account.id} value={account.id}>{account.name} · {money.format(balanceAt(account.id, transfer.date))}</IonSelectOption>)}</IonSelect></IonItem>}
             <IonItem className="form-item"><IonInput label="Fecha" labelPlacement="stacked" type="date" value={transfer.date} onIonInput={(event) => { setTransfer({ ...transfer, date: String(event.detail.value ?? '') }); setTransferError(''); }} /></IonItem>
             <IonItem className="form-item"><IonInput label="Descripción (opcional)" labelPlacement="stacked" value={transfer.note} onIonInput={(event) => setTransfer({ ...transfer, note: String(event.detail.value ?? '') })} /></IonItem>
             {transferError && <div role="alert" className="login-error movement-validation">{transferError}</div>}

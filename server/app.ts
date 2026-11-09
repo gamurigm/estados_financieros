@@ -253,8 +253,14 @@ function normalizeMovement(input: Record<string, unknown>) {
 
 async function ensureAccountsExist(pool: Pool | PoolClient, movement: ReturnType<typeof normalizeMovement>) {
   const ids = [...new Set([movement.account, movement.toAccount].filter((id): id is string => id !== null))];
-  const result = await pool.query('SELECT account_key FROM accounts WHERE account_key = ANY($1::text[])', [ids]);
+  const result = await pool.query('SELECT account_key, account_type FROM accounts WHERE account_key = ANY($1::text[])', [ids]);
   if (result.rows.length !== ids.length) throw new Error('Cuenta no encontrada.');
+  if (movement.kind === 'transfer') {
+    const types = new Map<string, string>(result.rows.map((row: { account_key: string; account_type: string }) => [row.account_key, row.account_type] as const));
+    if (types.get(movement.account) !== 'bank' || !['bank', 'cash'].includes(types.get(movement.toAccount) ?? '')) {
+      throw new Error('Las transferencias deben salir de una cuenta bancaria.');
+    }
+  }
 }
 
 function normalizeAccountName(value: unknown) {
